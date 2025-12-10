@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% block title %}Segmentação de Clientes (RFM){% endblock %}
+
+{% block content %}
+<div class="container-xl fade-in-up">
+
+  <div class="text-center mb-3">
+    <h1 class="h2 mb-1">Segmentação de Clientes — RFM</h1>
+    <p class="text-muted mb-0">
+      Análise de clientes com base em <strong>Recency</strong>, <strong>Frequency</strong> e
+      <strong>Monetary</strong>, com segmentação automática (VIP, leais, em risco, etc.).
+    </p>
+  </div>
+
+  <!-- Sub-navegação E-commerce -->
+  <div class="d-flex flex-wrap gap-2 justify-content-center mb-4">
+    <a class="btn btn-outline-secondary" href="{{ url_for('ecom_dashboard') }}">Dashboard de Vendas</a>
+    <a class="btn btn-primary" href="{{ url_for('ecom_rfm') }}">Segmentação RFM</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('ecom_clusters') }}">Clusters (K-Means)</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('ecom_forecast') }}">Previsão de Receita</a>
+  </div>
+
+  <!-- Filtros -->
+  <section class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+      <h2 class="h5 mb-3 text-center">Filtros</h2>
+
+      <form method="get"
+            action="{{ url_for('ecom_rfm') }}"
+            class="row g-3 align-items-end justify-content-center">
+
+        <div class="col-md-4">
+          <label class="form-label">País</label>
+          <select name="country" class="form-select">
+            <option value="">(Todos)</option>
+            {% for c in countries %}
+              <option value="{{ c }}" {% if filtros.country == c %}selected{% endif %}>
+                {{ c }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-12 d-flex gap-2 justify-content-center mt-1">
+          <button type="submit" class="btn btn-primary">
+            Aplicar filtros
+          </button>
+          <a href="{{ url_for('ecom_rfm') }}" class="btn btn-outline-secondary">
+            Limpar filtros
+          </a>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  {% if erro %}
+    <div class="alert alert-danger mb-4">
+      {{ erro }}
+    </div>
+  {% endif %}
+
+  {% if not erro %}
+
+    {% if seg_plot_div %}
+      <section class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+          <h2 class="h5 text-center mb-2">Distribuição por segmento</h2>
+          <p class="text-muted text-center">
+            Quantidade de clientes por grupo RFM. Ideal para demonstrar domínio de Customer Analytics.
+          </p>
+          <div>
+            {{ seg_plot_div | safe }}
+          </div>
+        </div>
+      </section>
+    {% endif %}
+
+    {% if seg_summary %}
+      <section class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+          <h2 class="h5 text-center mb-2">Resumo por segmento</h2>
+          <div class="table-responsive" style="max-height:320px;">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Segmento</th>
+                  <th class="text-end">Nº clientes</th>
+                  <th class="text-end">Recency médio (dias)</th>
+                  <th class="text-end">Frequência média</th>
+                  <th class="text-end">Receita total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in seg_summary %}
+                  <tr>
+                    <td>{{ row.Segment }}</td>
+                    <td class="text-end">{{ row.num_customers }}</td>
+                    <td class="text-end">
+                      {{ "%.1f"|format(row.avg_recency) if row.avg_recency is not none else "" }}
+                    </td>
+                    <td class="text-end">
+                      {{ "%.2f"|format(row.avg_frequency) if row.avg_frequency is not none else "" }}
+                    </td>
+                    <td class="text-end">
+                      {{ "%.2f"|format(row.total_monetary) if row.total_monetary is not none else "" }}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    {% endif %}
+
+    {% if rfm_table %}
+      <section class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+          <h2 class="h5 text-center mb-2">Top clientes por score RFM</h2>
+          <p class="text-muted text-center">
+            Os 200 principais clientes, ordenados pelo <code>RFM_score</code>
+            (quanto maior, melhor cliente).
+          </p>
+          <div class="table-responsive" style="max-height:400px;">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>CustomerID</th>
+                  <th class="text-end">Recency (dias)</th>
+                  <th class="text-end">Frequency</th>
+                  <th class="text-end">Monetary</th>
+                  <th class="text-end">R_score</th>
+                  <th class="text-end">F_score</th>
+                  <th class="text-end">M_score</th>
+                  <th class="text-end">RFM_score</th>
+                  <th>Segmento</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in rfm_table %}
+                  <tr>
+                    <td>{{ row.CustomerID }}</td>
+                    <td class="text-end">{{ row.Recency }}</td>
+                    <td class="text-end">{{ row.Frequency }}</td>
+                    <td class="text-end">{{ "%.2f"|format(row.Monetary) }}</td>
+                    <td class="text-end">{{ row.R_score }}</td>
+                    <td class="text-end">{{ row.F_score }}</td>
+                    <td class="text-end">{{ row.M_score }}</td>
+                    <td class="text-end">{{ row.RFM_score }}</td>
+                    <td>{{ row.Segment }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    {% endif %}
+
+  {% endif %}
+
+</div>
+{% endblock %}

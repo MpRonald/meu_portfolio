@@ -1,0 +1,573 @@
+{% extends 'base.html' %}
+{% block title %}Estatística Ames{% endblock %}
+{% block content %}
+
+<!-- Plotly (apenas esta página precisa) -->
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+<div class="container-xl">
+
+    <h1 class="mb-3">Análise Estatística - Imóveis</h1>
+    <p class="text-muted">
+        Explore as variáveis numéricas do dataset de imóveis.
+        Selecione uma variável e, opcionalmente, uma faixa de preço para visualizar a distribuição,
+        boxplot, medidas estatísticas, testes adicionais, correlações e mapa de localização.
+    </p>
+
+    <!-- Filtros -->
+    <form method="post" class="row g-3 mb-4">
+        <!-- Variável numérica -->
+        <div class="col-md-4">
+            <label for="variavel" class="form-label">Variável numérica</label>
+            <select class="form-select" id="variavel" name="variavel">
+                {% for v in variaveis %}
+                    <option value="{{ v }}" {% if v == variavel_selecionada %}selected{% endif %}>
+                        {{ nomes_amigaveis[v] }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Filtro por faixa de preço -->
+        <div class="col-md-4">
+            <label for="faixa_preco" class="form-label">Faixa de preço</label>
+            <select class="form-select" id="faixa_preco" name="faixa_preco">
+                {% for f in faixas %}
+                    <option value="{{ f }}" {% if f == faixa_selecionada %}selected{% endif %}>
+                        {% if f == "Todos" %}
+                            Todas as Faixas
+                        {% else %}
+                            {{ nomes_faixa[f] }}
+                        {% endif %}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Botões -->
+        <div class="col-md-4 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary me-2">Aplicar filtros</button>
+            <a href="{{ url_for('ames_dashboard') }}" class="btn btn-secondary">Limpar filtros</a>
+        </div>
+    </form>
+
+    <!-- Indicação do filtro atual -->
+    <div class="mb-3">
+        <span class="badge bg-info text-dark">
+            Variável: {{ nomes_amigaveis[variavel_selecionada] }}
+        </span>
+        <span class="badge bg-secondary">
+            Faixa de preço:
+            {% if faixa_selecionada == "Todos" %}
+                Todas as Faixas
+            {% else %}
+                {{ nomes_faixa[faixa_selecionada] }}
+            {% endif %}
+        </span>
+    </div>
+
+    <!-- Estatísticas principais -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="card-title">Nº de observações</h6>
+                    <p class="card-text fs-5">{{ estatisticas.n }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="card-title">Média</h6>
+                    <p class="card-text fs-5">
+                        {{ "%.2f"|format(estatisticas.media) }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="card-title">Mediana</h6>
+                    <p class="card-text fs-5">
+                        {{ "%.2f"|format(estatisticas.mediana) }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="card-title">Moda</h6>
+                    <p class="card-text fs-5">
+                        {% if estatisticas.moda is not none %}
+                            {{ "%.2f"|format(estatisticas.moda) }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mais estatísticas -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="card-title">Desvio padrão</h6>
+                    <p class="card-text fs-5">
+                        {{ "%.2f"|format(estatisticas.desvio_padrao) }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="card-title">Mínimo</h6>
+                    <p class="card-text fs-5">
+                        {{ "%.2f"|format(estatisticas.minimo) }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="card-title">Máximo</h6>
+                    <p class="card-text fs-5">
+                        {{ "%.2f"|format(estatisticas.maximo) }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="card-title">IQR (Q3 - Q1)</h6>
+                    <p class="card-text fs-5">
+                        {{ "%.2f"|format(estatisticas.iqr) }}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Normalidade (Shapiro-Wilk) -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        Teste de normalidade (Shapiro-Wilk)
+                        <span class="text-primary ms-1"
+                              style="cursor:pointer; font-weight:bold;"
+                              data-bs-toggle="tooltip"
+                              title="Avalia se os dados seguem distribuição normal. H0: a distribuição é normal.">
+                            ⓘ
+                        </span>
+                    </h6>
+                    {% if estatisticas.p_valor_shapiro is not none %}
+                        <p class="mb-1">
+                            Estatística: {{ "%.4f"|format(estatisticas.stat_shapiro) }}<br>
+                            p-valor: {{ "%.6f"|format(estatisticas.p_valor_shapiro) }}
+                        </p>
+                        <p class="text-muted">
+                            {{ interpretacao_normalidade }}
+                        </p>
+                    {% else %}
+                        <p>Não foi possível calcular o teste de normalidade para esta variável.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Testes estatísticos adicionais -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="card-title">Testes estatísticos adicionais</h6>
+
+                    <!-- Jarque–Bera -->
+                    {% if testes_extra.jb_p is not none %}
+                        <p class="mb-1">
+                            <strong>
+                                Teste de normalidade (Jarque–Bera)
+                                <span class="text-primary ms-1"
+                                      style="cursor:pointer; font-weight:bold;"
+                                      data-bs-toggle="tooltip"
+                                      title="Avalia normalidade com base em assimetria e curtose. H0: a distribuição é normal.">
+                                    ⓘ
+                                </span>
+                            </strong><br>
+                            Estatística: {{ "%.4f"|format(testes_extra.jb_stat) }}<br>
+                            p-valor: {{ "%.6f"|format(testes_extra.jb_p) }}
+                        </p>
+                        <p class="text-muted">
+                            {% if testes_extra.jb_p < 0.05 %}
+                                p &lt; 0,05 ⇒ rejeitamos a hipótese de normalidade (distribuição não normal).
+                            {% else %}
+                                p ≥ 0,05 ⇒ não rejeitamos a hipótese de normalidade (distribuição aproximadamente normal).
+                            {% endif %}
+                        </p>
+                    {% else %}
+                        <p>Não foi possível calcular o teste Jarque–Bera.</p>
+                    {% endif %}
+
+                    <hr>
+
+                    <!-- Correlação de Pearson com preço -->
+                    {% if testes_extra.corr_preco_r is not none %}
+                        <p class="mb-1">
+                            <strong>
+                                Correlação de Pearson com Preço do Imóvel (€)
+                                <span class="text-primary ms-1"
+                                      style="cursor:pointer; font-weight:bold;"
+                                      data-bs-toggle="tooltip"
+                                      title="Mede força e direção da relação linear entre a variável e o preço. H0: r = 0 (sem correlação linear).">
+                                    ⓘ
+                                </span>
+                            </strong><br>
+                            r = {{ "%.3f"|format(testes_extra.corr_preco_r) }}<br>
+                            p-valor: {{ "%.6f"|format(testes_extra.corr_preco_p) }}
+                        </p>
+                        <p class="text-muted">
+                            {% if testes_extra.corr_preco_p < 0.05 %}
+                                p &lt; 0,05 ⇒ correlação linear estatisticamente significativa.
+                            {% else %}
+                                p ≥ 0,05 ⇒ não há evidência de correlação linear significativa.
+                            {% endif %}
+                        </p>
+                    {% else %}
+                        <p class="mb-1">
+                            <strong>Correlação de Pearson com Preço do Imóvel (€)</strong><br>
+                            Não foi possível calcular.
+                        </p>
+                    {% endif %}
+
+                    <!-- Correlação de Pearson com preço por m² -->
+                    {% if testes_extra.corr_preco_m2_r is not none %}
+                        <p class="mb-1">
+                            <strong>
+                                Correlação de Pearson com Preço por m² (€)
+                                <span class="text-primary ms-1"
+                                      style="cursor:pointer; font-weight:bold;"
+                                      data-bs-toggle="tooltip"
+                                      title="Mede relação linear entre a variável selecionada e o preço por metro quadrado. H0: r = 0.">
+                                    ⓘ
+                                </span>
+                            </strong><br>
+                            r = {{ "%.3f"|format(testes_extra.corr_preco_m2_r) }}<br>
+                            p-valor: {{ "%.6f"|format(testes_extra.corr_preco_m2_p) }}
+                        </p>
+                        <p class="text-muted">
+                            {% if testes_extra.corr_preco_m2_p < 0.05 %}
+                                p &lt; 0,05 ⇒ correlação linear estatisticamente significativa.
+                            {% else %}
+                                p ≥ 0,05 ⇒ não há evidência de correlação linear significativa.
+                            {% endif %}
+                        </p>
+                    {% else %}
+                        <p class="mb-1">
+                            <strong>Correlação de Pearson com Preço por m² (€)</strong><br>
+                            Não foi possível calcular.
+                        </p>
+                    {% endif %}
+
+                    <hr>
+
+                    <!-- Correlação de Spearman com preço -->
+                    {% if testes_extra.corr_spearman_r is not none %}
+                        <p class="mb-1">
+                            <strong>
+                                Correlação de Spearman com Preço do Imóvel (€)
+                                <span class="text-primary ms-1"
+                                      style="cursor:pointer; font-weight:bold;"
+                                      data-bs-toggle="tooltip"
+                                      title="Mede relação monotónica (baseada em rankings), mais robusta a outliers e não exige linearidade. H0: ρ = 0 (sem correlação monotónica).">
+                                    ⓘ
+                                </span>
+                            </strong><br>
+                            ρ (rho) = {{ "%.3f"|format(testes_extra.corr_spearman_r) }}<br>
+                            p-valor: {{ "%.6f"|format(testes_extra.corr_spearman_p) }}
+                        </p>
+                        <p class="text-muted">
+                            {% if testes_extra.corr_spearman_p < 0.05 %}
+                                p &lt; 0,05 ⇒ correlação monotónica estatisticamente significativa.
+                            {% else %}
+                                p ≥ 0,05 ⇒ não há evidência de correlação monotónica significativa.
+                            {% endif %}
+                        </p>
+                    {% else %}
+                        <p class="mb-1">
+                            <strong>Correlação de Spearman com Preço do Imóvel (€)</strong><br>
+                            Não foi possível calcular.
+                        </p>
+                    {% endif %}
+
+                    <hr>
+
+                    <!-- Kruskal–Wallis por faixa de preço -->
+                    {% if testes_extra.kruskal_p is not none %}
+                        <p class="mb-1">
+                            <strong>
+                                Teste de Kruskal–Wallis por faixa de preço
+                                <span class="text-primary ms-1"
+                                      style="cursor:pointer; font-weight:bold;"
+                                      data-bs-toggle="tooltip"
+                                      title="Compara a distribuição da variável entre faixas de preço (baixo, médio, alto, etc.) sem assumir normalidade. H0: todas as faixas têm a mesma distribuição.">
+                                    ⓘ
+                                </span>
+                            </strong><br>
+                            H = {{ "%.4f"|format(testes_extra.kruskal_H) }}<br>
+                            p-valor: {{ "%.6f"|format(testes_extra.kruskal_p) }}
+                        </p>
+                        <p class="text-muted">
+                            {% if testes_extra.kruskal_p < 0.05 %}
+                                p &lt; 0,05 ⇒ pelo menos uma faixa de preço apresenta distribuição diferente
+                                para esta variável.
+                            {% else %}
+                                p ≥ 0,05 ⇒ não há evidência de diferença significativa entre as faixas de preço.
+                            {% endif %}
+                        </p>
+                    {% else %}
+                        <p class="mb-1">
+                            <strong>Teste de Kruskal–Wallis por faixa de preço</strong><br>
+                            Não foi possível calcular (verifique se há dados suficientes em cada faixa).
+                        </p>
+                    {% endif %}
+
+                    <hr>
+
+                    <!-- Regressão linear simples (var -> preço) -->
+                    {% if testes_extra.reg_r2 is not none %}
+                        <p class="mb-1">
+                            <strong>
+                                Regressão linear simples: Preço ~ {{ nomes_amigaveis[variavel_selecionada] }}
+                                <span class="text-primary ms-1"
+                                      style="cursor:pointer; font-weight:bold;"
+                                      data-bs-toggle="tooltip"
+                                      title="Modela o preço como função da variável selecionada. β₁ indica quanto o preço varia, em média, para cada unidade da variável. H0: β₁ = 0 (a variável não explica o preço).">
+                                    ⓘ
+                                </span>
+                            </strong><br>
+                            R² = {{ "%.3f"|format(testes_extra.reg_r2) }}<br>
+                            Interceção (β₀) = {{ "%.2f"|format(testes_extra.reg_beta0) }}<br>
+                            Coeficiente (β₁) = {{ "%.2f"|format(testes_extra.reg_beta1) }}<br>
+                            p-valor de β₁: {{ "%.6f"|format(testes_extra.reg_p_beta1) }}
+                        </p>
+                        <p class="text-muted">
+                            {% if testes_extra.reg_p_beta1 < 0.05 %}
+                                p &lt; 0,05 ⇒ a variável selecionada é um preditor estatisticamente significativo para o preço.
+                            {% else %}
+                                p ≥ 0,05 ⇒ não há evidência de que a variável selecionada explique o preço.
+                            {% endif %}
+                        </p>
+                    {% else %}
+                        <p class="mb-0">
+                            <strong>Regressão linear simples: Preço ~ {{ nomes_amigaveis[variavel_selecionada] }}</strong><br>
+                            Não foi possível calcular (verifique se a coluna <code>preco</code> existe e há dados suficientes).
+                        </p>
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Heatmap de correlação -->
+    <div class="row mb-4">
+        <div class="col-md-12 mb-4">
+            <h4>
+                Matriz de correlação (Pearson)
+                <span class="text-primary ms-1"
+                      style="cursor:pointer; font-weight:bold;"
+                      data-bs-toggle="tooltip"
+                      title="Mostra a força e direção da relação linear entre as principais variáveis numéricas. Valores próximos de 1 ou -1 indicam forte correlação; valores próximos de 0 indicam pouca correlação.">
+                    ⓘ
+                </span>
+            </h4>
+            <p class="text-muted small">
+                A matriz abaixo usa apenas as principais variáveis do modelo (preço, preço por m²,
+                área, quartos, etc.). Os valores vão de -1 (correlação negativa perfeita) a 1 (correlação positiva perfeita).
+            </p>
+            <div id="heatmap_corr" style="height:800px; max-width:100%;"></div>
+        </div>
+    </div>
+
+    <!-- Gráficos básicos -->
+    <div class="row mb-4">
+        <div class="col-md-12 mb-4">
+            <h4>Histograma</h4>
+            <div id="histograma"></div>
+        </div>
+
+        <div class="col-md-12 mb-4">
+            <h4>Boxplot</h4>
+            <div id="boxplot"></div>
+        </div>
+    </div>
+
+    <!-- Preço por Bairro (só aparece se houver dados) -->
+    {% if graph_box_bairro_json %}
+    <div class="row mb-4">
+        <div class="col-md-12 mb-4">
+            <h4>
+                Distribuição de preço por bairro
+                <span class="text-primary ms-1"
+                      style="cursor:pointer; font-weight:bold;"
+                      data-bs-toggle="tooltip"
+                      title="Compara a distribuição dos preços entre os diferentes bairros. Cada boxplot mostra mediana, quartis e possíveis outliers.">
+                    ⓘ
+                </span>
+            </h4>
+            <p class="text-muted small">
+                Útil para identificar bairros mais caros ou mais baratos, bem como a variação de preços dentro de cada um.
+            </p>
+            <div id="boxplot_bairro"></div>
+        </div>
+
+        {% if graph_bar_bairro_json %}
+        <div class="col-md-12 mb-4">
+            <h4>
+                Preço médio por bairro
+                <span class="text-primary ms-1"
+                      style="cursor:pointer; font-weight:bold;"
+                      data-bs-toggle="tooltip"
+                      title="Mostra o preço médio dos imóveis em cada bairro, permitindo ranquear as zonas mais valorizadas.">
+                    ⓘ
+                </span>
+            </h4>
+            <p class="text-muted small">
+                Os bairros são ordenados do mais caro para o mais barato com base no preço médio.
+            </p>
+            <div id="bar_bairro"></div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Gráficos adicionais: dispersão e boxplot por faixa -->
+    <div class="row mb-4">
+        <div class="col-md-12 mb-4">
+            <h4>
+                Dispersão: Preço vs {{ nomes_amigaveis[variavel_selecionada] }}
+            </h4>
+            <div id="scatter_preco"></div>
+        </div>
+
+        <div class="col-md-12 mb-4">
+            <h4>
+                {{ nomes_amigaveis[variavel_selecionada] }} por faixa de preço
+            </h4>
+            <div id="boxplot_faixa"></div>
+        </div>
+    </div>
+
+    <!-- Preço vs Ano de Construção -->
+    <div class="row mb-4">
+        <div class="col-md-12 mb-4">
+            <h4>
+                Preço do Imóvel ao longo do Ano de Construção
+                <span class="text-primary ms-1"
+                      style="cursor:pointer; font-weight:bold;"
+                      data-bs-toggle="tooltip"
+                      title="Mostra como o preço dos imóveis varia em função do ano de construção. Permite identificar tendências de valorização ou desvalorização ao longo do tempo.">
+                    ⓘ
+                </span>
+            </h4>
+            <p class="text-muted small">
+                Cada ponto representa um imóvel. As cores mostram a faixa de preço (quando disponível).
+            </p>
+            <div id="scatter_preco_ano"></div>
+        </div>
+    </div>
+
+    <!-- Mapa de imóveis -->
+    <div class="row mb-4">
+        <div class="col-md-12 mb-4">
+            <h4>
+                Mapa de imóveis (latitude e longitude)
+                <span class="text-primary ms-1"
+                      style="cursor:pointer; font-weight:bold;"
+                      data-bs-toggle="tooltip"
+                      title="Mostra a localização geográfica dos imóveis filtrados. As cores representam faixas de preço; o tamanho dos pontos pode representar o preço absoluto.">
+                    ⓘ
+                </span>
+            </h4>
+            <p class="text-muted small">
+                O mapa utiliza apenas os imóveis que possuem latitude e longitude válidas e respeita os filtros seleccionados acima.
+            </p>
+            <div id="mapa_imoveis" style="height:550px;"></div>
+        </div>
+    </div>
+
+</div> <!-- fim container -->
+
+<!-- SCRIPTS DOS GRÁFICOS (usa Plotly já carregado acima) -->
+<script>
+    // Histograma e Boxplot
+    var histData = {{ graph_hist_json | safe }};
+    var boxData  = {{ graph_box_json  | safe }};
+    Plotly.newPlot('histograma', histData.data, histData.layout);
+    Plotly.newPlot('boxplot',    boxData.data,  boxData.layout);
+
+    // Dispersão Preço vs Variável selecionada
+    {% if graph_scatter_json %}
+        var scatterData = {{ graph_scatter_json | safe }};
+        Plotly.newPlot('scatter_preco', scatterData.data, scatterData.layout);
+    {% endif %}
+
+    // Boxplot por faixa de preço
+    {% if graph_box_faixa_json %}
+        var boxFaixaData = {{ graph_box_faixa_json | safe }};
+        Plotly.newPlot('boxplot_faixa', boxFaixaData.data, boxFaixaData.layout);
+    {% endif %}
+
+    // Preço vs Ano de Construção
+    {% if graph_preco_ano_json %}
+        var scatterAnoData = {{ graph_preco_ano_json | safe }};
+        Plotly.newPlot('scatter_preco_ano', scatterAnoData.data, scatterAnoData.layout);
+    {% endif %}
+
+    // Preço por Bairro (boxplot)
+    {% if graph_box_bairro_json %}
+        var boxBairroData = {{ graph_box_bairro_json | safe }};
+        Plotly.newPlot('boxplot_bairro', boxBairroData.data, boxBairroData.layout);
+    {% endif %}
+
+    // Preço médio por Bairro (barras)
+    {% if graph_bar_bairro_json %}
+        var barBairroData = {{ graph_bar_bairro_json | safe }};
+        Plotly.newPlot('bar_bairro', barBairroData.data, barBairroData.layout);
+    {% endif %}
+
+    // Heatmap de correlação
+    {% if graph_heatmap_json %}
+        var heatData = {{ graph_heatmap_json | safe }};
+        Plotly.newPlot('heatmap_corr', heatData.data, heatData.layout, {responsive: true});
+    {% endif %}
+
+    // Mapa de imóveis (lat/lon)
+    {% if graph_map_json %}
+        var mapData = {{ graph_map_json | safe }};
+        Plotly.newPlot('mapa_imoveis', mapData.data, mapData.layout, {responsive: true});
+    {% endif %}
+
+    // Inicializar tooltips Bootstrap (já tens Bootstrap no base.html)
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    const tooltipList = [...tooltipTriggerList].map(el => new bootstrap.Tooltip(el));
+</script>
+
+{% endblock %}

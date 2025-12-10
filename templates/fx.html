@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+{% block title %}Previsão de Câmbio{% endblock %}
+
+{% block content %}
+<div class="container-xl fade-in-up" style="max-width: 980px;">
+
+  <!-- Cabeçalho -->
+  <div class="mb-3 text-center">
+    <h1 class="h2 mb-1">Previsão de Câmbio</h1>
+    <p class="text-muted mb-0">
+      Escolha o <strong>par de moedas</strong>, o <strong>algoritmo</strong> e o número de dias (até 180)
+      para ver a previsão e as métricas do modelo.
+    </p>
+  </div>
+
+  {% if erro %}
+    <div class="alert alert-danger mx-auto mb-3" style="max-width: 760px;">
+      {{ erro }}
+    </div>
+  {% endif %}
+
+  <!-- Formulário -->
+  <div class="card quotes-form-card mb-3">
+    <div class="card-body">
+      <form method="post" action="{{ url_for('fx') }}" class="quotes-form">
+
+        <div class="quotes-form-grid">
+          <!-- Par de moedas -->
+          <label>
+            <span class="form-label-text">Par de moedas</span>
+            <select name="pair" class="form-select" required>
+              {% for nome, ticker in pairs.items() %}
+                <option value="{{ nome }}"
+                  {% if resultado and resultado.pair_name == nome %}selected{% endif %}>
+                  {{ nome }} ({{ ticker }})
+                </option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <!-- Algoritmo -->
+          <label>
+            <span class="form-label-text">Algoritmo</span>
+            <select name="algoritmo" class="form-select" required>
+              <option value="rf"
+                {% if resultado and resultado.algoritmo == 'rf' %}selected{% endif %}>
+                Random Forest
+              </option>
+              <option value="arima"
+                {% if resultado and resultado.algoritmo == 'arima' %}selected{% endif %}>
+                ARIMA
+              </option>
+              <option value="prophet"
+                {% if resultado and resultado.algoritmo == 'prophet' %}selected{% endif %}>
+                Prophet
+              </option>
+            </select>
+          </label>
+
+          <!-- Nº de dias -->
+          <label>
+            <span class="form-label-text">Nº de dias a prever (1–180)</span>
+            <input type="number"
+                   name="n_days"
+                   min="1"
+                   max="180"
+                   class="form-control"
+                   value="{{ resultado.n_days if resultado else 30 }}">
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">
+            Calcular previsão
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  {% if resultado %}
+    <!-- Métricas -->
+    <section class="card section-card">
+      <div class="card-body">
+        <h2 class="h5 text-center mb-1">
+          Resultado — {{ resultado.pair_name }} com {{ resultado.algoritmo_label }}
+        </h2>
+        <p class="text-muted text-center mb-2">
+          As métricas abaixo foram calculadas no conjunto de teste do modelo
+          (aprox. 20% dos dados históricos dos últimos 3 anos).
+        </p>
+
+        <div class="metrics-grid">
+          <div class="metric-box">
+            <strong>
+              MAE
+              <span class="info-icon"
+                    data-bs-toggle="tooltip"
+                    title="Mean Absolute Error (Erro Absoluto Médio): média do valor absoluto dos erros. Quanto menor, melhor.">
+                i
+              </span>
+            </strong>
+            <div class="metric-value">
+              {{ "%.6f"|format(resultado.metrics.mae) }}
+            </div>
+          </div>
+
+          <div class="metric-box">
+            <strong>
+              RMSE
+              <span class="info-icon"
+                    data-bs-toggle="tooltip"
+                    title="Root Mean Squared Error: penaliza mais os erros grandes. Quanto menor, melhor.">
+                i
+              </span>
+            </strong>
+            <div class="metric-value">
+              {{ "%.6f"|format(resultado.metrics.rmse) }}
+            </div>
+          </div>
+
+          <div class="metric-box">
+            <strong>
+              MAPE (%)
+              <span class="info-icon"
+                    data-bs-toggle="tooltip"
+                    title="Mean Absolute Percentage Error: erro percentual médio absoluto. Quanto menor, melhor.">
+                i
+              </span>
+            </strong>
+            <div class="metric-value">
+              {{ "%.3f"|format(resultado.metrics.mape) }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Gráfico Plotly: histórico + previsão -->
+    <section class="card section-card">
+      <div class="card-body">
+        <h3 class="h5 text-center mb-1">Histórico recente e previsão</h3>
+        <p class="text-muted text-center mb-3">
+          Passe o rato sobre a linha para ver a data e a taxa correspondente.
+        </p>
+        <div>
+          {{ resultado.fx_plot_div | safe }}
+        </div>
+      </div>
+    </section>
+
+    <!-- Tabela de previsões -->
+    <section class="card section-card">
+      <div class="card-body">
+        <h3 class="h5 text-center mb-1">
+          Previsão para os próximos {{ resultado.n_days }} dias
+        </h3>
+        <p class="text-muted text-center mb-2">
+          Valores previstos para a taxa de câmbio {{ resultado.pair_name }}.
+        </p>
+
+        <div class="forecast-table-container">
+          <div class="forecast-table-inner">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th class="text-end">Taxa prevista</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for dt, row in resultado.forecast.iterrows() %}
+                  <tr>
+                    <td>{{ dt.date().isoformat() }}</td>
+                    <td class="text-end">
+                      {{ "%.3f"|format(row.forecast_rate) }}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  {% endif %}
+
+</div>
+
+<script>
+  // Inicializar tooltips Bootstrap nesta página (mesma lógica usada em outros templates)
+  document.addEventListener('DOMContentLoaded', function () {
+    if (window.bootstrap) {
+      var tooltipTriggerList = [].slice.call(
+        document.querySelectorAll('[data-bs-toggle="tooltip"]')
+      );
+      tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+        new bootstrap.Tooltip(tooltipTriggerEl);
+      });
+    }
+  });
+</script>
+
+{% endblock %}

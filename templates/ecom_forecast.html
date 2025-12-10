@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% block title %}Previsão de Receita (E-commerce){% endblock %}
+
+{% block content %}
+<div class="container-xl fade-in-up">
+
+  <div class="text-center mb-3">
+    <h1 class="h2 mb-1">Previsão de Receita Mensal — E-commerce</h1>
+    <p class="text-muted mb-0">
+      Este painel utiliza <strong>Facebook Prophet</strong> para prever a receita mensal da loja
+      com base no histórico completo de vendas.
+    </p>
+  </div>
+
+  <!-- Sub-navegação E-commerce -->
+  <div class="d-flex flex-wrap gap-2 justify-content-center mb-4">
+    <a class="btn btn-outline-secondary" href="{{ url_for('ecom_dashboard') }}">Dashboard de Vendas</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('ecom_rfm') }}">Segmentação RFM</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('ecom_clusters') }}">Clusters (K-Means)</a>
+    <a class="btn btn-primary" href="{{ url_for('ecom_forecast') }}">Previsão de Receita</a>
+  </div>
+
+  <section class="card mb-3">
+    <div class="card-body">
+      <h2 class="h5 mb-3 text-center">Configuração da previsão</h2>
+      <form method="get"
+            action="{{ url_for('ecom_forecast') }}"
+            class="row g-3 align-items-end justify-content-center">
+
+        <div class="col-md-4">
+          <label class="form-label">Nº de meses a prever (1–36)</label>
+          <input type="number"
+                 class="form-control"
+                 name="periods"
+                 min="1"
+                 max="36"
+                 value="{{ periods or 12 }}">
+        </div>
+
+        <div class="col-12 d-flex justify-content-center gap-2 mt-1">
+          <button type="submit" class="btn btn-primary">
+            Atualizar previsão
+          </button>
+          <a href="{{ url_for('ecom_dashboard') }}" class="btn btn-outline-secondary">
+            Voltar ao Dashboard de Vendas
+          </a>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  {% if erro %}
+    <div class="alert alert-danger mb-3">
+      {{ erro }}
+    </div>
+  {% endif %}
+
+  {% if kpis %}
+    <section class="card mb-3">
+      <div class="card-body">
+        <h2 class="h5 text-center mb-2">KPIs da previsão</h2>
+        <p class="text-muted text-center mb-3">
+          Indicadores calculados a partir da série histórica e da previsão gerada.
+        </p>
+
+        <div class="metrics-grid">
+          <div class="metric-box">
+            <strong>Receita últimos 12 meses</strong>
+            <div class="metric-value">
+              {{ "%.2f"|format(kpis.last12_revenue) }}
+            </div>
+          </div>
+
+          {% if kpis.next12_revenue is not none %}
+            <div class="metric-box">
+              <strong>Receita prevista próximos 12 meses</strong>
+              <div class="metric-value">
+                {{ "%.2f"|format(kpis.next12_revenue) }}
+              </div>
+            </div>
+          {% endif %}
+
+          {% if kpis.cagr is not none %}
+            <div class="metric-box">
+              <strong>CAGR histórico (anual)</strong>
+              <div class="metric-value">
+                {{ "%.2f"|format(kpis.cagr * 100) }}%
+              </div>
+            </div>
+          {% endif %}
+
+          <div class="metric-box">
+            <strong>Receita média mensal (histórico)</strong>
+            <div class="metric-value">
+              {{ "%.2f"|format(kpis.avg_monthly_hist) }}
+            </div>
+          </div>
+
+          {% if kpis.avg_monthly_forecast is not none %}
+            <div class="metric-box">
+              <strong>Receita média mensal (previsão)</strong>
+              <div class="metric-value">
+                {{ "%.2f"|format(kpis.avg_monthly_forecast) }}
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+  {% endif %}
+
+  {% if forecast_plot_div %}
+    <section class="card mb-3">
+      <div class="card-body">
+        <h2 class="h5 text-center mb-2">Receita mensal (histórico + previsão)</h2>
+        <p class="text-muted text-center mb-3">
+          As barras representam a <strong>receita mensal real</strong> e a linha tracejada
+          representa a <strong>previsão</strong> dos próximos meses.
+        </p>
+        <div>
+          {{ forecast_plot_div | safe }}
+        </div>
+      </div>
+    </section>
+  {% endif %}
+
+</div>
+{% endblock %}

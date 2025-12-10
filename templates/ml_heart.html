@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+{% block title %}ML · Risco de Doença Coronária{% endblock %}
+{% block content %}
+
+<div class="container-xl" style="max-width: 980px;">
+
+  <div class="text-center mb-3">
+    <h1 class="h2 mb-1">Risco de Doença Arterial Coronária</h1>
+    <p class="text-muted mb-0">
+      {% if heart_info %}
+        Fonte: {{ heart_info.source }}
+        {% if heart_info.version %} · Modelo: {{ heart_info.version }}{% endif %}
+      {% else %}
+        Preencha os campos e veja a previsão estimada para a próxima década.
+      {% endif %}
+    </p>
+  </div>
+
+  {% if error %}
+    <div class="alert alert-danger mx-auto mb-3" style="max-width: 760px;">
+      {{ error }}
+    </div>
+  {% endif %}
+
+  <form method="post" class="mt-3">
+    <div class="row g-3">
+
+      <div class="col-md-4">
+        <label class="form-label">Sexo</label>
+        <select name="sexo" class="form-select">
+          <option value="1" {% if defaults.sexo=='1' %}selected{% endif %}>Masculino</option>
+          <option value="0" {% if defaults.sexo=='0' %}selected{% endif %}>Feminino</option>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Idade (anos)</label>
+        <input type="text" name="idade" class="form-control"
+               value="{{ defaults.idade }}">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Cigarros por dia</label>
+        <input type="text" name="cigarros_por_dia" class="form-control"
+               value="{{ defaults.cigarros_por_dia }}">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Medicamento para pressão</label>
+        <select name="uso_medicamento_pressao" class="form-select">
+          <option value="0" {% if defaults.uso_medicamento_pressao=='0' %}selected{% endif %}>Não</option>
+          <option value="1" {% if defaults.uso_medicamento_pressao=='1' %}selected{% endif %}>Sim</option>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">AVC (histórico)</label>
+        <select name="AVC" class="form-select">
+          <option value="0" {% if defaults.AVC=='0' %}selected{% endif %}>Não</option>
+          <option value="1" {% if defaults.AVC=='1' %}selected{% endif %}>Sim</option>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Hipertensão</label>
+        <select name="hipertensao" class="form-select">
+          <option value="0" {% if defaults.hipertensao=='0' %}selected{% endif %}>Não</option>
+          <option value="1" {% if defaults.hipertensao=='1' %}selected{% endif %}>Sim</option>
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Diabetes</label>
+        <select name="diabetes" class="form-select">
+          <option value="0" {% if defaults.diabetes=='0' %}selected{% endif %}>Não</option>
+          <option value="1" {% if defaults.diabetes=='1' %}selected{% endif %}>Sim</option>
+        </select>
+      </div>
+
+      <!-- Colesterol -->
+      <div class="col-md-4">
+        <label class="form-label">
+          Colesterol total (mg/dL)
+          <span class="info-icon"
+                data-bs-toggle="tooltip"
+                title="Colesterol total no sangue. Valores elevados aumentam o risco cardiovascular.">
+            i
+          </span>
+        </label>
+        <input type="text" name="colesterol_total" class="form-control"
+               value="{{ defaults.colesterol_total }}">
+      </div>
+
+      <!-- Pressão sistólica -->
+      <div class="col-md-4">
+        <label class="form-label">
+          Pressão sistólica (mmHg)
+          <span class="info-icon"
+                data-bs-toggle="tooltip"
+                title="Valor mais alto da pressão arterial, medido durante a contração do coração.">
+            i
+          </span>
+        </label>
+        <input type="text" name="pressao_arterial_sistolica" class="form-control"
+               value="{{ defaults.pressao_arterial_sistolica }}">
+      </div>
+
+      <!-- Pressão diastólica -->
+      <div class="col-md-4">
+        <label class="form-label">
+          Pressão diastólica (mmHg)
+          <span class="info-icon"
+                data-bs-toggle="tooltip"
+                title="Valor mais baixo da pressão arterial, medido entre batimentos.">
+            i
+          </span>
+        </label>
+        <input type="text" name="pressao_arterial_diastolica" class="form-control"
+               value="{{ defaults.pressao_arterial_diastolica }}">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">IMC</label>
+        <input type="text" name="IMC" class="form-control"
+               value="{{ defaults.IMC }}">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Frequência cardíaca (bpm)</label>
+        <input type="text" name="freq_cardiaca" class="form-control"
+               value="{{ defaults.freq_cardiaca }}">
+      </div>
+
+      <!-- Glicemia -->
+      <div class="col-md-4">
+        <label class="form-label">
+          Glicemia (mg/dL)
+          <span class="info-icon"
+                data-bs-toggle="tooltip"
+                title="Glicemia em jejum. Valores elevados aumentam o risco metabólico e cardiovascular.">
+            i
+          </span>
+        </label>
+        <input type="text" name="glicemia" class="form-control"
+               value="{{ defaults.glicemia }}">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Perfil de consumo de tabaco</label>
+        <select name="fumante" class="form-select">
+          <option value="0" {% if defaults.fumante=='0' %}selected{% endif %}>Não fumante</option>
+          <option value="1" {% if defaults.fumante=='1' %}selected{% endif %}>Leve</option>
+          <option value="2" {% if defaults.fumante=='2' %}selected{% endif %}>Moderado</option>
+          <option value="3" {% if defaults.fumante=='3' %}selected{% endif %}>Intenso</option>
+        </select>
+      </div>
+
+    </div>
+
+    <div class="mt-4 d-flex flex-wrap gap-2">
+      <button class="btn btn-primary" type="submit">Calcular risco</button>
+    </div>
+  </form>
+
+  {% if result %}
+    <div class="card shadow-sm border-0 mt-4 risk-card">
+      <div class="card-body text-center">
+        <div class="mb-2">
+          {% if risk_level == 'alto' %}
+            <span class="badge badge-risk-high">Risco alto</span>
+          {% elif risk_level == 'baixo' %}
+            <span class="badge badge-risk-low">Risco baixo</span>
+          {% else %}
+            <span class="badge badge-risk-unknown">Risco estimado</span>
+          {% endif %}
+        </div>
+
+        <h3 class="h5 mb-2">Resultado</h3>
+        <p class="mb-2 fs-5">{{ result }}</p>
+
+        {% if prob_pct is not none %}
+          <p class="text-muted mb-1">
+            Probabilidade estimada para a classe prevista: <strong>{{ prob_pct }}%</strong>
+          </p>
+
+          <div class="risk-bar">
+            <div class="risk-bar-fill
+                        {% if risk_level == 'alto' %}risk-bar-high{% else %}risk-bar-low{% endif %}"
+                 style="width: {{ prob_pct }}%;">
+            </div>
+          </div>
+          <div class="d-flex justify-content-between small text-muted mt-1">
+            <span>0%</span>
+            <span>50%</span>
+            <span>100%</span>
+          </div>
+        {% endif %}
+
+        {% if risk_insights %}
+          <hr class="my-3">
+          <h4 class="h6 mb-2">Principais fatores observados (educacional)</h4>
+          <ul class="text-start small mb-0">
+            {% for msg in risk_insights %}
+              <li>{{ msg }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  <hr class="my-4" />
+  <p class="text-muted text-center small mb-0">
+    Aviso: este demo é exclusivamente educacional e não substitui aconselhamento médico profissional.
+  </p>
+
+</div>
+
+<script>
+  // Inicializar tooltips do Bootstrap nesta página
+  document.addEventListener('DOMContentLoaded', function () {
+    if (window.bootstrap) {
+      var tooltipTriggerList = [].slice.call(
+        document.querySelectorAll('[data-bs-toggle="tooltip"]')
+      );
+      tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+        new bootstrap.Tooltip(tooltipTriggerEl);
+      });
+    }
+  });
+</script>
+
+{% endblock %}

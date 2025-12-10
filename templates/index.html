@@ -1,0 +1,296 @@
+{% extends 'base.html' %}
+{% block title %}Portefólio de Data Science · Ronald Pio{% endblock %}
+{% block content %}
+
+<div class="container-xl" style="max-width: 1200px;">
+
+  <!-- HERO CENTRALIZADO (SEM FOTO) -->
+  <section class="hero mb-5">
+    <div class="d-flex flex-column align-items-center text-center">
+
+      <h1 class="display-5 fw-bold mb-2">Ronald Marques Pio</h1>
+
+      <p class="lead text-muted mb-1">
+        Cientista de Dados & Analista de Dados · Python · Machine Learning · Business Analytics
+      </p>
+
+      <p class="text-muted small mb-3">
+        Aveiro, Portugal · Nacionalidade portuguesa e brasileira
+      </p>
+
+      <p class="text-muted mb-3" style="max-width: 700px;">
+        Profissional orientado a resultados, com experiência em transformar dados complexos em
+        decisões claras para gestão — desde churn e risco de crédito até vendas, análise operacional
+        e grandes bases de dados europeias.
+      </p>
+
+      <!-- BADGES -->
+      <div class="d-flex flex-wrap justify-content-center gap-2 mb-3">
+        <span class="badge rounded-pill text-bg-light border">Machine Learning</span>
+        <span class="badge rounded-pill text-bg-light border">Análise de Dados</span>
+        <span class="badge rounded-pill text-bg-light border">Power BI</span>
+        <span class="badge rounded-pill text-bg-light border">Python</span>
+        <span class="badge rounded-pill text-bg-light border">SQL</span>
+        <span class="badge rounded-pill text-bg-light border">NLP em PT</span>
+      </div>
+
+      <!-- BOTÕES -->
+      <div class="d-flex flex-wrap justify-content-center gap-2">
+        <a class="button ghost" href="https://www.linkedin.com/in/ronaldpio" target="_blank">LinkedIn →</a>
+        <a class="button ghost" href="https://github.com/MpRonald" target="_blank">GitHub →</a>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- RESULTADOS REAIS -->
+  <section class="mb-5">
+    <h2 class="h4 mb-3 text-center">Resultados reais gerados por mim</h2>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-body">
+            <ul class="text-muted small mb-0">
+              <li class="mb-2">
+                <strong>Redução de 4x no tempo de geração de relatórios</strong>  
+                ao integrar Python e SQL para extrair e preparar dados de uma base com mais de 25 milhões de linhas
+                (projeto Affereo).
+              </li>
+              <li class="mb-2">
+                <strong>Dashboards de gestão em Power BI</strong> ligados a SQL Server, com
+                atualizações automáticas e métricas em tempo quase real para suporte a decisões estratégicas
+                (projeto Solicit).
+              </li>
+              <li class="mb-2">
+                <strong>Automatização de relatórios semanais, mensais e trimestrais</strong>  
+                em Python + SQL, eliminando tarefas manuais repetitivas e aumentando a fiabilidade dos indicadores.
+              </li>
+              <li>
+                <strong>Modelos de risco e scoring</strong> (churn, crédito, comportamento de utilizadores),
+                focados em explicar o “porquê” do resultado para perfis não técnicos.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-body">
+            <ul class="text-muted small mb-0">
+              <li class="mb-2">
+                <strong>Otimização de desempenho em SQL Server</strong>, com queries mais eficientes
+                e estruturação de tabelas para respostas mais rápidas e relatórios mais completos.
+              </li>
+              <li class="mb-2">
+                <strong>Criação de pipelines analíticos de ponta a ponta</strong>  
+                desde a ingestão de dados (APIs, ficheiros, bases de dados) até dashboards e modelos preditivos.
+              </li>
+              <li>
+                <strong>Mentoria e formação em Data Science</strong>, ajudando estudantes e profissionais
+                a darem os primeiros passos com Python e Machine Learning.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROJETOS INTERATIVOS (CARDS-BOTÕES) -->
+  <section class="mb-5">
+    <h2 class="h4 text-center mb-3">Projetos interativos neste portefólio</h2>
+
+    <div class="d-grid gap-3"
+         style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
+
+      <a class="card portfolio-card text-decoration-none" href="{{ url_for('ecom_dashboard') }}">
+        <div class="card-body text-center">
+          <h5 class="fw-semibold mb-1">📊 Análise de Vendas</h5>
+          <p class="text-muted small mb-0">KPIs, previsão de receita e segmentação de clientes</p>
+        </div>
+      </a>
+
+      <a class="card portfolio-card text-decoration-none" href="{{ url_for('quotes') }}">
+        <div class="card-body text-center">
+          <h5 class="fw-semibold mb-1">📈 Mercado & Ações</h5>
+          <p class="text-muted small mb-0">Histórico de preços e modelos preditivos</p>
+        </div>
+      </a>
+
+      <a class="card portfolio-card text-decoration-none" href="{{ url_for('weather') }}">
+        <div class="card-body text-center">
+          <h5 class="fw-semibold mb-1">🌦️ Previsão do Tempo</h5>
+          <p class="text-muted small mb-0">Dados Open-Meteo + visualização interativa</p>
+        </div>
+      </a>
+
+      <a class="card portfolio-card text-decoration-none" href="{{ url_for('ml_heart') }}">
+        <div class="card-body text-center">
+          <h5 class="fw-semibold mb-1">❤️ Risco Cardiovascular</h5>
+          <p class="text-muted small mb-0">Modelo de risco para 10 anos (educacional)</p>
+        </div>
+      </a>
+
+      <a class="card portfolio-card text-decoration-none" href="{{ url_for('nlp_supervised') }}">
+        <div class="card-body text-center">
+          <h5 class="fw-semibold mb-1">💬 Análise de Sentimentos</h5>
+          <p class="text-muted small mb-0">NLP em português com TF-IDF + ML</p>
+        </div>
+      </a>
+
+      <a class="card portfolio-card text-decoration-none" href="{{ url_for('loan_form') }}">
+        <div class="card-body text-center">
+          <h5 class="fw-semibold mb-1">🏦 Análise de Crédito</h5>
+          <p class="text-muted small mb-0">Probabilidade de incumprimento (default)</p>
+        </div>
+      </a>
+
+      <a class="card portfolio-card text-decoration-none" href="{{ url_for('fx') }}">
+        <div class="card-body text-center">
+          <h5 class="fw-semibold mb-1">💱 Previsão Cambial</h5>
+          <p class="text-muted small mb-0">Forecast em séries temporais</p>
+        </div>
+      </a>
+
+      <a class="card portfolio-card text-decoration-none" href="{{ url_for('churn_xai_dashboard') }}">
+        <div class="card-body text-center">
+          <h5 class="fw-semibold mb-1">📉 Churn de Clientes</h5>
+          <p class="text-muted small mb-0">Modelo preditivo com explicabilidade</p>
+        </div>
+      </a>
+
+      <a class="card portfolio-card text-decoration-none" href="{{ url_for('ames_dashboard') }}">
+        <div class="card-body text-center">
+          <h5 class="fw-semibold mb-1">🏠 Estatística Imobiliária</h5>
+          <p class="text-muted small mb-0">Exploração de dados do dataset Ames</p>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <!-- EXPERIÊNCIA PROFISSIONAL (DESTAQUE) -->
+  <section class="mb-5">
+    <h2 class="h4 mb-3 text-center">Experiência profissional em dados</h2>
+
+    <div class="row g-4">
+      <!-- Freelance -->
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-body">
+            <h3 class="h6 mb-1">Freelance · Data Scientist & Trainer</h3>
+            <p class="text-muted small mb-2">2024 — Atual</p>
+            <ul class="text-muted small mb-0">
+              <li>Desenvolvimento de modelos de previsão, churn, risco e scoring.</li>
+              <li>Automatização de análises recorrentes (semanal/mensal/trimestral) em Python + SQL.</li>
+              <li>Criação de dashboards em Power BI e Streamlit para equipas de gestão.</li>
+              <li>Formação e mentoria em Python, Machine Learning e análise de dados.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Solicit -->
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-body">
+            <h3 class="h6 mb-1">Cientista de Dados · Solicit</h3>
+            <p class="text-muted small mb-2">2024</p>
+            <ul class="text-muted small mb-0">
+              <li>Conceção de base de dados em SQL Server a partir de dados brutos do cliente.</li>
+              <li>Construção de dashboards em Power BI com DAX avançado para a gestão.</li>
+              <li>Automatização da atualização de relatórios via Power BI e Power Automate.</li>
+              <li>Utilização de Python para validação, tratamento de dados e geração de relatórios finais.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Affereo -->
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-body">
+            <h3 class="h6 mb-1">Cientista de Dados · Affereo</h3>
+            <p class="text-muted small mb-2">2023</p>
+            <ul class="text-muted small mb-0">
+              <li>Trabalho com base de dados de +25M de linhas com informação de todos os países da UE.</li>
+              <li>Desenvolvimento de scripts em Python + SQL para integração e extração eficiente de dados.</li>
+              <li>Normalização de tabelas e melhoria da qualidade e consistência dos dados.</li>
+              <li>Redução significativa do tempo de entrega de relatórios para a equipa de análise.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gestão / Background -->
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-body">
+            <h3 class="h6 mb-1">Experiência prévia em gestão & operações</h3>
+            <p class="text-muted small mb-2">+12 anos em funções de gestão</p>
+            <ul class="text-muted small mb-0">
+              <li>Construção e liderança de equipas, com foco em melhoria contínua.</li>
+              <li>Análise financeira e logística orientada a resultados.</li>
+              <li>Participação em projetos de software e responsabilidade pela área de TI.</li>
+              <li>Integração de soluções tecnológicas no dia a dia do negócio.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPETÊNCIAS & FORMAÇÃO -->
+  <section class="row g-4 mb-4">
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h2 class="h6 mb-3">Competências técnicas</h2>
+          <ul class="text-muted small mb-0">
+            <li><strong>Python:</strong> Pandas, NumPy, Scikit-learn, Statsmodels</li>
+            <li><strong>ML:</strong> classificação, regressão, modelos em árvore, churn, risco</li>
+            <li><strong>Power BI & DAX:</strong> dashboards, KPIs, relatórios automatizados</li>
+            <li><strong>SQL:</strong> SQL Server, consultas complexas, otimização</li>
+            <li><strong>NLP:</strong> TF-IDF, análise de sentimentos em PT</li>
+            <li><strong>Visualização:</strong> Plotly, Streamlit</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h2 class="h6 mb-3">Forma de trabalhar</h2>
+          <ul class="text-muted small mb-0">
+            <li>Comunicação clara com áreas de negócio e IT.</li>
+            <li>Foco em explicar modelos de forma simples e objetiva.</li>
+            <li>Entrega orientada a prazos e impacto no negócio.</li>
+            <li>Curiosidade técnica + visão prática: o modelo tem de gerar valor.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h2 class="h6 mb-3">Formação</h2>
+          <ul class="text-muted small mb-3">
+            <li>Pós-graduação em Big Data & Data Science — PUC</li>
+            <li>Licenciatura em Gestão da Tecnologia da Informação</li>
+            <li>Múltiplos cursos avançados de Python, ML e BI</li>
+            <li>Inglês — nível B2</li>
+          </ul>
+          <p class="small text-muted mb-0">
+            Disponível para posições como <strong>Cientista de Dados</strong> ou
+            <strong>Analista de Dados</strong> em Portugal e na Europa.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+{% endblock %}

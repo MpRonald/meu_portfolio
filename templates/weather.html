@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+{% block title %}Previsão do Tempo{% endblock %}
+
+{% block content %}
+<div class="container-xl fade-in-up">
+
+  <div class="mb-3 text-center">
+    <h1 class="h2 mb-1">Previsão do Tempo</h1>
+    <p class="text-muted mb-0">
+      Fonte: Open-Meteo · Até 15 dias · Sem necessidade de API key.
+    </p>
+  </div>
+
+  <form method="get"
+        action="{{ url_for('weather') }}"
+        class="row g-3 align-items-end mb-3">
+
+    <div class="col-md-4">
+      <label class="form-label">Cidade</label>
+      <input
+        type="text"
+        class="form-control"
+        name="city"
+        value="{{ city or '' }}"
+        placeholder="Lisboa, Porto, Coimbra..."
+        required
+      />
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">Dias</label>
+      <input
+        type="number"
+        class="form-control"
+        name="days"
+        min="1"
+        max="30"
+        value="{{ meta.days if meta else 7 }}"
+      />
+    </div>
+
+    <div class="col-md-3">
+      <label class="form-label">Unidades</label>
+      <select class="form-select" name="units">
+        <option value="metric" {% if units=='metric' %}selected{% endif %}>
+          Métrico (°C, km/h)
+        </option>
+        <option value="imperial" {% if units=='imperial' %}selected{% endif %}>
+          Imperial (°F, mph)
+        </option>
+      </select>
+    </div>
+
+    <div class="col-md-3 d-flex justify-content-end">
+      <button class="btn btn-primary" type="submit">
+        Atualizar
+      </button>
+    </div>
+  </form>
+
+  {% if error %}
+    <div class="alert alert-danger mb-3">
+      {{ error }}
+    </div>
+  {% endif %}
+
+  {% if meta and chart %}
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-body text-center">
+        <h2 class="h5 mb-1">{{ meta.city }}</h2>
+        <div class="text-muted small">
+          {{ meta.lat }}, {{ meta.lon }} · {{ meta.timezone }}<br>
+          Período: {{ meta.days }} dia(s) ·
+          Unidades: {{ meta.temp_unit }}, {{ meta.wind_unit }}
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-wrap" style="min-height: 320px;">
+      <canvas id="wxChart"></canvas>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        const labels = {{ chart.labels | tojson | safe }};
+        const tmax   = {{ chart.tmax   | tojson | safe }};
+        const tmin   = {{ chart.tmin   | tojson | safe }};
+        const rain   = {{ chart.rain   | tojson | safe }};
+        const wmax   = {{ chart.wmax   | tojson | safe }};
+        const prob   = {{ chart.prob   | tojson | safe }};  // probabilidade de chuva (%)
+
+        const ctx = document.getElementById('wxChart').getContext('2d');
+
+        const chart = new Chart(ctx, {
+          // tipo base obrigatório para mixed chart em Chart.js
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [
+              {
+                // Temp máx = vermelho
+                type: 'line',
+                label: 'Temp máx ({{ meta.temp_unit }})',
+                data: tmax,
+                yAxisID: 'yTemp',
+                tension: 0.2,
+                pointRadius: 0,
+                borderWidth: 2,
+                borderColor: '#ef4444',
+                backgroundColor: '#ef4444'
+              },
+              {
+                // Temp mín = azul
+                type: 'line',
+                label: 'Temp mín ({{ meta.temp_unit }})',
+                data: tmin,
+                yAxisID: 'yTemp',
+                tension: 0.2,
+                pointRadius: 0,
+                borderWidth: 2,
+                borderColor: '#3b82f6',
+                backgroundColor: '#3b82f6'
+              },
+              {
+                // Chuva = azul (barras)
+                type: 'bar',
+                label: 'Chuva (mm)',
+                data: rain,
+                yAxisID: 'yRain',
+                borderWidth: 1,
+                borderColor: '#0ea5e9',
+                backgroundColor: 'rgba(14,165,233,0.35)'
+              },
+              {
+                // Vento máx = chumbo (cinza escuro)
+                type: 'line',
+                label: 'Vento máx ({{ meta.wind_unit }})',
+                data: wmax,
+                yAxisID: 'yWind',
+                tension: 0.2,
+                pointRadius: 0,
+                borderWidth: 2,
+                borderColor: '#4b5563',
+                backgroundColor: '#4b5563'
+              },
+              {
+                // Probabilidade de chuva (%)
+                type: 'line',
+                label: 'Prob. chuva (%)',
+                data: prob,
+                yAxisID: 'yProb',
+                tension: 0.2,
+                pointRadius: 0,
+                borderWidth: 2,
+                borderDash: [5, 5],
+                borderColor: '#eab308',
+                backgroundColor: '#eab308'
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { display: true },
+              tooltip: { enabled: true }
+            },
+            scales: {
+              yTemp: {
+                type: 'linear',
+                position: 'left',
+                title: { display: true, text: 'Temperatura' }
+              },
+              yRain: {
+                type: 'linear',
+                position: 'right',
+                title: { display: true, text: 'Chuva (mm)' },
+                grid: { drawOnChartArea: false }
+              },
+              yWind: {
+                type: 'linear',
+                position: 'right',
+                display: false
+              },
+              yProb: {
+                type: 'linear',
+                position: 'right',
+                offset: true,
+                min: 0,
+                max: 100,
+                title: { display: true, text: 'Prob. chuva (%)' },
+                grid: { drawOnChartArea: false }
+              }
+            }
+          }
+        });
+      });
+    </script>
+  {% endif %}
+
+</div>
+{% endblock %}

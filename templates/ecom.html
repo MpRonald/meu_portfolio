@@ -1,0 +1,261 @@
+{% extends 'base.html' %}
+{% block title %}Análise de Vendas{% endblock %}
+
+{% block content %}
+<div class="container-xl fade-in-up ecom-page">
+
+  <div class="text-center mb-3">
+    <h1 class="h2 mb-1">Análise de Vendas (E-commerce)</h1>
+    <p class="text-muted mb-0">
+      Dashboard interativo com <strong>KPIs</strong>, <strong>gráficos</strong> e
+      <strong>tabelas</strong> a partir de dados reais da loja online.
+    </p>
+  </div>
+
+  <!-- Sub-navegação do módulo E-commerce -->
+  <div class="d-flex flex-wrap gap-2 justify-content-center mb-4">
+    <a class="btn btn-primary" href="{{ url_for('ecom_dashboard') }}">Dashboard de Vendas</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('ecom_rfm') }}">Segmentação RFM</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('ecom_clusters') }}">Clusters (K-Means)</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('ecom_forecast') }}">Previsão de Receita</a>
+  </div>
+
+  {# ----------------- FILTROS ----------------- #}
+  <section class="card mb-3">
+    <div class="card-body">
+      <h2 class="h5 mb-3 text-center">Filtros</h2>
+
+      <form method="get" action="{{ url_for('ecom_dashboard') }}" class="row g-3 align-items-end">
+
+        <div class="col-md-3">
+          <label class="form-label">Data inicial</label>
+          <input type="date"
+                 class="form-control"
+                 name="start_date"
+                 value="{{ filtros.start_date }}">
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Data final</label>
+          <input type="date"
+                 class="form-control"
+                 name="end_date"
+                 value="{{ filtros.end_date }}">
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">País</label>
+          <select name="country" class="form-select">
+            <option value="">(Todos)</option>
+            {% for c in countries %}
+              <option value="{{ c }}" {% if filtros.country == c %}selected{% endif %}>
+                {{ c }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Produto</label>
+          <select name="product" class="form-select">
+            <option value="">(Todos)</option>
+            {% for p in products %}
+              <option value="{{ p }}" {% if filtros.product == p %}selected{% endif %}>
+                {{ p }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-12 d-flex flex-wrap gap-2 mt-1">
+          <button type="submit" class="btn btn-primary">Aplicar filtros</button>
+          <a href="{{ url_for('ecom_dashboard') }}" class="btn btn-outline-secondary">
+            Limpar filtros
+          </a>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  {% if erro %}
+    <div class="alert alert-danger mb-3">
+      {{ erro }}
+    </div>
+  {% endif %}
+
+  {# ----------------- KPIs ----------------- #}
+  {% if kpis %}
+    <section class="card mb-3">
+      <div class="card-body">
+        <h2 class="h5 text-center mb-1">Indicadores-chave (KPIs)</h2>
+        <p class="text-muted text-center mb-3">
+          Resultados calculados após aplicar os filtros acima.
+        </p>
+
+        <div class="metrics-grid">
+          <div class="metric-box">
+            <strong>Receita total</strong>
+            <div class="metric-value">
+              {{ "%.2f"|format(kpis.total_revenue) }}
+            </div>
+          </div>
+
+          <div class="metric-box">
+            <strong>Nº de encomendas</strong>
+            <div class="metric-value">
+              {{ kpis.num_orders }}
+            </div>
+          </div>
+
+          <div class="metric-box">
+            <strong>Nº de clientes únicos</strong>
+            <div class="metric-value">
+              {{ kpis.num_customers }}
+            </div>
+          </div>
+
+          <div class="metric-box">
+            <strong>Ticket médio</strong>
+            <div class="metric-value">
+              {{ "%.2f"|format(kpis.avg_ticket) }}
+            </div>
+          </div>
+
+          <div class="metric-box">
+            <strong>Itens médios por encomenda</strong>
+            <div class="metric-value">
+              {{ "%.2f"|format(kpis.avg_items_per_order) }}
+            </div>
+          </div>
+
+          <div class="metric-box">
+            <strong>Receita média por cliente</strong>
+            <div class="metric-value">
+              {{ "%.2f"|format(kpis.avg_revenue_per_customer) }}
+            </div>
+          </div>
+
+          <div class="metric-box">
+            <strong>Duração do período (dias)</strong>
+            <div class="metric-value">
+              {{ kpis.period_days }}
+            </div>
+          </div>
+
+          <div class="metric-box">
+            <strong>Receita média diária</strong>
+            <div class="metric-value">
+              {{ "%.2f"|format(kpis.avg_daily_revenue) }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  {% endif %}
+
+  {# ----------------- GRÁFICOS ----------------- #}
+  {% if revenue_plot_div or products_plot_div or countries_plot_div %}
+    <section class="d-flex flex-column gap-3 mb-3">
+
+      {% if revenue_plot_div %}
+        <div class="card">
+          <div class="card-body">
+            <h2 class="h5 mb-2 text-center">Receita ao longo do tempo</h2>
+            <div>{{ revenue_plot_div | safe }}</div>
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="row g-3">
+        {% if products_plot_div %}
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-body">
+                <h2 class="h5 mb-2 text-center">Top 10 produtos por receita</h2>
+                <div>{{ products_plot_div | safe }}</div>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        {% if countries_plot_div %}
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-body">
+                <h2 class="h5 mb-2 text-center">Top 10 países por receita</h2>
+                <div>{{ countries_plot_div | safe }}</div>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+  {% endif %}
+
+  {# ----------------- TABELAS ----------------- #}
+  <section class="row g-3 mb-3">
+
+    {% if top_products_table %}
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-body">
+            <h2 class="h5 mb-2 text-center">Top 10 produtos (tabela)</h2>
+            <div class="table-responsive" style="max-height:320px;">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Produto</th>
+                    <th class="text-end">Receita</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in top_products_table %}
+                    <tr>
+                      <td>{{ row.Description }}</td>
+                      <td class="text-end">
+                        {{ "%.2f"|format(row.TotalPrice) }}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if top_countries_table %}
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-body">
+            <h2 class="h5 mb-2 text-center">Top 10 países (tabela)</h2>
+            <div class="table-responsive" style="max-height:320px;">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>País</th>
+                    <th class="text-end">Receita</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in top_countries_table %}
+                    <tr>
+                      <td>{{ row.Country }}</td>
+                      <td class="text-end">
+                        {{ "%.2f"|format(row.TotalPrice) }}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+  </section>
+
+</div>
+{% endblock %}

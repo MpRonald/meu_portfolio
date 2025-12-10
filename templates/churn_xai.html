@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+{% block title %}Previsão de Churn (Clientes Telco){% endblock %}
+
+{% block content %}
+<div class="container-xl" style="max-width: 980px;">
+
+  <div class="text-center mb-3">
+    <h1 class="h2 mb-1">Previsão de Churn — Clientes Telco</h1>
+    <p class="text-muted mb-0">
+      Preencha os dados do cliente para estimar a probabilidade de cancelamento.
+    </p>
+  </div>
+
+  {% if erro %}
+    <div class="alert alert-danger mx-auto mb-3" style="max-width: 760px;">
+      {{ erro }}
+    </div>
+  {% endif %}
+
+  <section class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+      <h2 class="h5 mb-3">Dados do cliente</h2>
+
+      <form method="post" class="row g-3">
+
+        <div class="col-md-3">
+          <label class="form-label">Género</label>
+          <select name="gender" class="form-select">
+            <option value="Female" {% if defaults.gender == 'Female' %}selected{% endif %}>Feminino</option>
+            <option value="Male" {% if defaults.gender == 'Male' %}selected{% endif %}>Masculino</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Idoso</label>
+          <select name="SeniorCitizen" class="form-select">
+            <option value="0" {% if defaults.SeniorCitizen == '0' %}selected{% endif %}>Não</option>
+            <option value="1" {% if defaults.SeniorCitizen == '1' %}selected{% endif %}>Sim</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Tem parceiro(a)?</label>
+          <select name="Partner" class="form-select">
+            <option value="No" {% if defaults.Partner == 'No' %}selected{% endif %}>Não</option>
+            <option value="Yes" {% if defaults.Partner == 'Yes' %}selected{% endif %}>Sim</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Tem dependentes?</label>
+          <select name="Dependents" class="form-select">
+            <option value="No" {% if defaults.Dependents == 'No' %}selected{% endif %}>Não</option>
+            <option value="Yes" {% if defaults.Dependents == 'Yes' %}selected{% endif %}>Sim</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Tempo de contrato (meses)</label>
+          <input type="number" class="form-control" name="tenure" min="0" step="1"
+                 value="{{ defaults.tenure }}">
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Serviço telefónico</label>
+          <select name="PhoneService" class="form-select">
+            <option value="No" {% if defaults.PhoneService == 'No' %}selected{% endif %}>Não</option>
+            <option value="Yes" {% if defaults.PhoneService == 'Yes' %}selected{% endif %}>Sim</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Múltiplas linhas</label>
+          <select name="MultipleLines" class="form-select">
+            <option value="No" {% if defaults.MultipleLines == 'No' %}selected{% endif %}>Não</option>
+            <option value="Yes" {% if defaults.MultipleLines == 'Yes' %}selected{% endif %}>Sim</option>
+            <option value="No phone service" {% if defaults.MultipleLines == 'No phone service' %}selected{% endif %}>
+              Sem serviço telefónico
+            </option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Serviço de Internet</label>
+          <select name="InternetService" class="form-select">
+            <option value="DSL" {% if defaults.InternetService == 'DSL' %}selected{% endif %}>DSL</option>
+            <option value="Fiber optic" {% if defaults.InternetService == 'Fiber optic' %}selected{% endif %}>
+              Fibra óptica
+            </option>
+            <option value="No" {% if defaults.InternetService == 'No' %}selected{% endif %}>Nenhum</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Segurança online</label>
+          <select name="OnlineSecurity" class="form-select">
+            <option value="No" {% if defaults.OnlineSecurity == 'No' %}selected{% endif %}>Não</option>
+            <option value="Yes" {% if defaults.OnlineSecurity == 'Yes' %}selected{% endif %}>Sim</option>
+            <option value="No internet service" {% if defaults.OnlineSecurity == 'No internet service' %}selected{% endif %}>
+              Sem Internet
+            </option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Backup online</label>
+          <select name="OnlineBackup" class="form-select">
+            <option value="No" {% if defaults.OnlineBackup == 'No' %}selected{% endif %}>Não</option>
+            <option value="Yes" {% if defaults.OnlineBackup == 'Yes' %}selected{% endif %}>Sim</option>
+            <option value="No internet service" {% if defaults.OnlineBackup == 'No internet service' %}selected{% endif %}>
+              Sem Internet
+            </option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Proteção de dispositivos</label>
+          <select name="DeviceProtection" class="form-select">
+            <option value="No" {% if defaults.DeviceProtection == 'No' %}selected{% endif %}>Não</option>
+            <option value="Yes" {% if defaults.DeviceProtection == 'Yes' %}selected{% endif %}>Sim</option>
+            <option value="No internet service" {% if defaults.DeviceProtection == 'No internet service' %}selected{% endif %}>
+              Sem Internet
+            </option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Suporte técnico</label>
+          <select name="TechSupport" class="form-select">
+            <option value="No" {% if defaults.TechSupport == 'No' %}selected{% endif %}>Não</option>
+            <option value="Yes" {% if defaults.TechSupport == 'Yes' %}selected{% endif %}>Sim</option>
+            <option value="No internet service" {% if defaults.TechSupport == 'No internet service' %}selected{% endif %}>
+              Sem Internet
+            </option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Streaming TV</label>
+          <select name="StreamingTV" class="form-select">
+            <option value="No" {% if defaults.StreamingTV == 'No' %}selected{% endif %}>Não</option>
+            <option value="Yes" {% if defaults.StreamingTV == 'Yes' %}selected{% endif %}>Sim</option>
+            <option value="No internet service" {% if defaults.StreamingTV == 'No internet service' %}selected{% endif %}>
+              Sem Internet
+            </option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Streaming de filmes</label>
+          <select name="StreamingMovies" class="form-select">
+            <option value="No" {% if defaults.StreamingMovies == 'No' %}selected{% endif %}>Não</option>
+            <option value="Yes" {% if defaults.StreamingMovies == 'Yes' %}selected{% endif %}>Sim</option>
+            <option value="No internet service" {% if defaults.StreamingMovies == 'No internet service' %}selected{% endif %}>
+              Sem Internet
+            </option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Tipo de contrato</label>
+          <select name="Contract" class="form-select">
+            <option value="Month-to-month" {% if defaults.Contract == 'Month-to-month' %}selected{% endif %}>Mensal</option>
+            <option value="One year" {% if defaults.Contract == 'One year' %}selected{% endif %}>1 ano</option>
+            <option value="Two year" {% if defaults.Contract == 'Two year' %}selected{% endif %}>2 anos</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Faturação eletrónica</label>
+          <select name="PaperlessBilling" class="form-select">
+            <option value="No" {% if defaults.PaperlessBilling == 'No' %}selected{% endif %}>Não</option>
+            <option value="Yes" {% if defaults.PaperlessBilling == 'Yes' %}selected{% endif %}>Sim</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Método de pagamento</label>
+          <select name="PaymentMethod" class="form-select">
+            <option value="Electronic check" {% if defaults.PaymentMethod == 'Electronic check' %}selected{% endif %}>
+              Cheque eletrónico
+            </option>
+            <option value="Mailed check" {% if defaults.PaymentMethod == 'Mailed check' %}selected{% endif %}>
+              Cheque enviado por correio
+            </option>
+            <option value="Bank transfer (automatic)" {% if defaults.PaymentMethod == 'Bank transfer (automatic)' %}selected{% endif %}>
+              Débito bancário automático
+            </option>
+            <option value="Credit card (automatic)" {% if defaults.PaymentMethod == 'Credit card (automatic)' %}selected{% endif %}>
+              Cartão de crédito automático
+            </option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Encargos mensais (€)</label>
+          <input type="number" class="form-control" name="MonthlyCharges" step="0.01"
+                 value="{{ defaults.MonthlyCharges }}">
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Total pago (€)</label>
+          <input type="number" class="form-control" name="TotalCharges" step="0.01"
+                 value="{{ defaults.TotalCharges }}">
+        </div>
+
+        <div class="col-12 d-flex flex-wrap gap-2 mt-2">
+          <button type="submit" class="btn btn-primary">
+            Calcular risco de churn
+          </button>
+          <a href="{{ url_for('churn_xai_dashboard') }}" class="btn btn-outline-secondary">
+            Limpar formulário
+          </a>
+        </div>
+
+      </form>
+    </div>
+  </section>
+
+  {% if result %}
+    <section class="card shadow-sm border-0 mb-4">
+      <div class="card-body text-center">
+        <h2 class="h5 mb-2">Resultado</h2>
+        <p class="fs-5 mb-1">
+          {{ result }}
+        </p>
+        <p class="text-muted mb-0">
+          Probabilidade estimada de churn:
+          <strong>{{ prob_pct }}%</strong>
+        </p>
+      </div>
+    </section>
+  {% endif %}
+
+</div>
+{% endblock %}

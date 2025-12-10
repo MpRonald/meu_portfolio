@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+{% block title %}Clusters de Clientes (RFM + K-Means){% endblock %}
+
+{% block content %}
+<div class="container-xl fade-in-up">
+
+  <div class="text-center mb-3">
+    <h1 class="h2 mb-1">Clusters de Clientes — RFM + K-Means</h1>
+    <p class="text-muted mb-0">
+      Segmentação de clientes com base em <strong>Recency</strong>, <strong>Frequency</strong> e
+      <strong>Monetary</strong>, usando <strong>K-Means</strong>. Excelente para demonstrar competências
+      em <strong>Customer Analytics</strong> e <strong>Machine Learning não supervisionado</strong>.
+    </p>
+  </div>
+
+  <!-- Sub-navegação E-commerce -->
+  <div class="d-flex flex-wrap gap-2 justify-content-center mb-4">
+    <a class="btn btn-outline-secondary" href="{{ url_for('ecom_dashboard') }}">Dashboard de Vendas</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('ecom_rfm') }}">Segmentação RFM</a>
+    <a class="btn btn-primary" href="{{ url_for('ecom_clusters') }}">Clusters (K-Means)</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('ecom_forecast') }}">Previsão de Receita</a>
+  </div>
+
+  <!-- Filtros -->
+  <section class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+      <h2 class="h5 mb-3 text-center">Filtros e parâmetros</h2>
+
+      <form method="get"
+            action="{{ url_for('ecom_clusters') }}"
+            class="row g-3 align-items-end justify-content-center">
+
+        <div class="col-md-4">
+          <label class="form-label">País</label>
+          <select name="country" class="form-select">
+            <option value="">(Todos)</option>
+            {% for c in countries %}
+              <option value="{{ c }}" {% if filtros.country == c %}selected{% endif %}>
+                {{ c }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Nº de clusters (k)</label>
+          <select name="k" class="form-select">
+            {% for kk in [2,3,4,5,6,7,8] %}
+              <option value="{{ kk }}" {% if k == kk %}selected{% endif %}>{{ kk }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-12 d-flex gap-2 justify-content-center mt-1">
+          <button type="submit" class="btn btn-primary">
+            Aplicar
+          </button>
+          <a href="{{ url_for('ecom_clusters') }}" class="btn btn-outline-secondary">
+            Limpar filtros
+          </a>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  {% if erro %}
+    <div class="alert alert-danger mb-4">
+      {{ erro }}
+    </div>
+  {% endif %}
+
+  {% if not erro %}
+
+    {% if cluster_bar_div or cluster_scatter_div %}
+      <section class="d-flex flex-column gap-3 mb-4">
+
+        {% if cluster_bar_div %}
+          <div class="card shadow-sm border-0">
+            <div class="card-body">
+              <h2 class="h5 text-center mb-2">Distribuição de clientes por cluster</h2>
+              <p class="text-muted text-center">
+                Quantidade de clientes em cada grupo K-Means.
+              </p>
+              <div>
+                {{ cluster_bar_div | safe }}
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        {% if cluster_scatter_div %}
+          <div class="card shadow-sm border-0">
+            <div class="card-body">
+              <h2 class="h5 text-center mb-2">Mapa de clientes (Frequency × Monetary)</h2>
+              <p class="text-muted text-center">
+                Cada ponto representa um cliente, colorido pelo cluster. Útil para identificar grupos
+                com alta frequência e alta receita.
+              </p>
+              <div>
+                {{ cluster_scatter_div | safe }}
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+      </section>
+    {% endif %}
+
+    {% if cluster_summary %}
+      <section class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+          <h2 class="h5 text-center mb-2">Resumo por cluster</h2>
+          <div class="table-responsive" style="max-height:320px;">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Cluster</th>
+                  <th class="text-end">Nº clientes</th>
+                  <th class="text-end">Recency médio (dias)</th>
+                  <th class="text-end">Frequency média</th>
+                  <th class="text-end">Monetary médio</th>
+                  <th class="text-end">Receita total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in cluster_summary %}
+                  <tr>
+                    <td>Cluster {{ row.Cluster }}</td>
+                    <td class="text-end">{{ row.num_customers }}</td>
+                    <td class="text-end">
+                      {{ "%.1f"|format(row.avg_recency) if row.avg_recency is not none else "" }}
+                    </td>
+                    <td class="text-end">
+                      {{ "%.2f"|format(row.avg_frequency) if row.avg_frequency is not none else "" }}
+                    </td>
+                    <td class="text-end">
+                      {{ "%.2f"|format(row.avg_monetary) if row.avg_monetary is not none else "" }}
+                    </td>
+                    <td class="text-end">
+                      {{ "%.2f"|format(row.total_monetary) if row.total_monetary is not none else "" }}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    {% endif %}
+
+    {% if cluster_table %}
+      <section class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+          <h2 class="h5 text-center mb-2">Top clientes por cluster (RFM + K-Means)</h2>
+          <p class="text-muted text-center">
+            Amostra dos 300 principais clientes, ordenados por cluster e receita total.
+          </p>
+          <div class="table-responsive" style="max-height:400px;">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>CustomerID</th>
+                  <th class="text-end">Recency (dias)</th>
+                  <th class="text-end">Frequency</th>
+                  <th class="text-end">Monetary</th>
+                  <th class="text-end">Cluster</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in cluster_table %}
+                  <tr>
+                    <td>{{ row.CustomerID }}</td>
+                    <td class="text-end">{{ row.Recency }}</td>
+                    <td class="text-end">{{ row.Frequency }}</td>
+                    <td class="text-end">{{ "%.2f"|format(row.Monetary) }}</td>
+                    <td class="text-end">{{ row.Cluster }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    {% endif %}
+
+  {% endif %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+{% block title %}Análise de Crédito · Estado do Empréstimo{% endblock %}
+
+{% block content %}
+<div class="container-xl">
+
+  <div class="mb-4 text-center">
+    <h1 class="h2 mb-2">Análise de Crédito</h1>
+    <p class="text-muted mb-0">
+      Preencha os campos para estimar a <strong>probabilidade de incumprimento</strong> (default).
+      O modelo utiliza um pipeline com pré-processamento e SMOTE.
+    </p>
+  </div>
+
+  {% if erro %}
+    <div class="alert alert-danger mb-4">
+      {{ erro }}
+    </div>
+  {% endif %}
+
+  {% if prob is defined %}
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-body">
+        <h2 class="h5 mb-3">Resultado da análise</h2>
+        <p class="mb-1">
+          Probabilidade estimada de incumprimento:
+          <strong>{{ prob }}</strong>
+        </p>
+        <p class="mb-0 text-muted">
+          Classificação de risco:
+          <strong class="text-body">{{ risco[0:5] }}</strong>
+        </p>
+      </div>
+    </div>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('loan_prever') }}">
+    <div class="row g-3">
+
+      <!-- Numéricos -->
+      <div class="col-md-4">
+        <label class="form-label">Idade</label>
+        <input
+          type="number"
+          class="form-control"
+          name="idade"
+          step="1"
+          min="18"
+          max="100"
+          placeholder="ex.: 35"
+          required
+        >
+        <div class="form-text">Anos completos.</div>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Rendimento anual</label>
+        <input
+          type="number"
+          class="form-control"
+          name="rendimento_anual"
+          step="0.01"
+          min="0"
+          placeholder="ex.: 45000"
+          required
+        >
+        <div class="form-text">Na mesma moeda utilizada no treino do modelo.</div>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Anos de emprego</label>
+        <input
+          type="number"
+          class="form-control"
+          name="anos_emprego"
+          step="0.1"
+          min="0"
+          max="60"
+          placeholder="ex.: 5"
+          required
+        >
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Valor do empréstimo</label>
+        <input
+          type="number"
+          class="form-control"
+          name="valor_emprestimo"
+          step="0.01"
+          min="0"
+          placeholder="ex.: 10000"
+          required
+        >
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Taxa de juro (% a.a.)</label>
+        <input
+          type="number"
+          class="form-control"
+          name="taxa_juros"
+          step="0.01"
+          min="0"
+          max="100"
+          placeholder="ex.: 12.5"
+          required
+        >
+        <div class="form-text">Informe em percentagem ao ano.</div>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">% do rendimento comprometido</label>
+        <input
+          type="number"
+          class="form-control"
+          name="percent_rendimento"
+          step="0.0001"
+          min="0"
+          max="1"
+          placeholder="ex.: 0.20"
+          required
+        >
+        <div class="form-text">
+          Proporção entre 0 e 1 (ex.: 0.20 = 20% do rendimento).
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Anos de histórico de crédito</label>
+        <input
+          type="number"
+          class="form-control"
+          name="anos_historico_credito"
+          step="0.1"
+          min="0"
+          max="80"
+          placeholder="ex.: 10"
+          required
+        >
+      </div>
+
+      <!-- Categóricos -->
+      <div class="col-md-4">
+        <label class="form-label">Tipo de habitação</label>
+        <select class="form-select" name="tipo_habitacao" required>
+          {% for opt in opcoes['tipo_habitacao'] %}
+            <option value="{{ opt }}">{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Finalidade do empréstimo</label>
+        <select class="form-select" name="finalidade_emprestimo" required>
+          {% for opt in opcoes['finalidade_emprestimo'] %}
+            <option value="{{ opt }}">{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Grau do empréstimo</label>
+        <select class="form-select" name="grau_emprestimo" required>
+          {% for opt in opcoes['grau_emprestimo'] %}
+            <option value="{{ opt }}">{{ opt }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">Escala de "Excelente" a "Altamente arriscado".</div>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Histórico de incumprimento no cadastro</label>
+        <select class="form-select" name="historico_inadimplencia" required>
+          {% for val, label in opcoes['historico_inadimplencia'] %}
+            <option value="{{ val }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">O modelo recebe internamente <code>Y</code> / <code>N</code>.</div>
+      </div>
+
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 mt-4">
+      <button type="submit" class="btn btn-primary">
+        Calcular risco
+      </button>
+      <a class="btn btn-outline-secondary" href="{{ url_for('index') }}">
+        Voltar
+      </a>
+    </div>
+  </form>
+
+</div>
+{% endblock %}

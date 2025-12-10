@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% block title %}NLP · Análise de Sentimentos (PT){% endblock %}
+
+{% block content %}
+<div class="container-xl fade-in-up" style="max-width: 760px;">
+
+  <!-- Cabeçalho -->
+  <div class="text-center mb-3">
+    <h1 class="h2 mb-2">Análise de Sentimentos (Português)</h1>
+    <p class="text-muted mb-1">
+      Modelo em produção: <strong>TF-IDF + classificador</strong>, treinado em textos em português.
+    </p>
+    <p class="text-muted mb-0">
+      Saídas possíveis: <code>bom</code>, <code>ruim</code> ou <code>neutro</code>.
+    </p>
+  </div>
+
+  {% if stats and stats.classes %}
+    <p class="text-muted text-center" style="margin-top:-4px;">
+      Classes do modelo: <code>{{ stats.classes|join(', ') }}</code>
+    </p>
+  {% endif %}
+
+  {% if error %}
+    <div class="alert alert-danger mx-auto mb-3" style="max-width: 760px;">
+      {{ error }}
+    </div>
+  {% endif %}
+
+  <!-- Formulário em card -->
+  <div class="card quotes-form-card mt-3">
+    <div class="card-body">
+      <form method="post" class="quotes-form">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Texto</label>
+          <textarea
+            name="text"
+            rows="6"
+            class="form-control"
+            placeholder="Escreva aqui a frase, comentário ou opinião a analisar..."
+          >{{ defaults.text }}</textarea>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">
+            Analisar sentimento
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if result %}
+    <!-- Card de resultado -->
+    <div class="card shadow-sm border-0 mt-4 sentiment-card">
+      <div class="card-body text-center">
+        <div class="mb-2">
+          {% if result|lower == 'bom' %}
+            <span class="badge sentiment-badge-positive">Sentimento positivo</span>
+          {% elif result|lower == 'ruim' %}
+            <span class="badge sentiment-badge-negative">Sentimento negativo</span>
+          {% else %}
+            <span class="badge sentiment-badge-neutral">Sentimento neutro</span>
+          {% endif %}
+        </div>
+
+        <h3 class="h5 mb-2">Resultado</h3>
+        <p class="mb-1 fs-5">
+          Sentimento: <strong>{{ result }}</strong>
+        </p>
+        <p class="mb-2 text-muted">
+          Score (probabilidade de positivo): <code>{{ (score or 0) | round(3) }}</code>
+        </p>
+
+        {% if score is not none %}
+          {% set score_pct = ((score or 0) * 100) | round(0) %}
+          <div class="sentiment-score-bar">
+            <div class="sentiment-score-bar-fill"
+                 style="width: {{ score_pct }}%;"></div>
+          </div>
+          <div class="d-flex justify-content-between small text-muted mt-1">
+            <span>0%</span>
+            <span>50%</span>
+            <span>100%</span>
+          </div>
+        {% endif %}
+
+        {% if meta %}
+          <hr class="my-3">
+          <details>
+            <summary class="text-muted" style="cursor:pointer;">
+              Ver detalhes técnicos do modelo
+            </summary>
+            {% if meta.raw_pred %}
+              <p class="text-muted mb-1 mt-2">
+                Rótulo original do classificador:
+                <code>{{ meta.raw_pred }}</code>
+              </p>
+            {% endif %}
+            {% if stats and stats.classes %}
+              <p class="text-muted mb-1">
+                Ordem das classes em <code>predict_proba</code>:
+                <code>{{ stats.classes|join(', ') }}</code>
+              </p>
+            {% endif %}
+            {% if meta.score_strategy %}
+              <p class="text-muted mb-0">
+                Estratégia de score:
+                <code>{{ meta.score_strategy }}</code>
+              </p>
+            {% endif %}
+          </details>
+        {% endif %}
+
+        <p class="text-muted mb-0 mt-3">
+          Engine de classificação: {{ engine }}
+        </p>
+      </div>
+    </div>
+  {% endif %}
+
+  <hr class="my-4" />
+  <p class="text-muted text-center small mb-0">
+    Aviso: este demo é exclusivamente educacional e não substitui aconselhamento profissional.
+  </p>
+
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+<<<<<<< HEAD
+# Framework web
+Flask==3.0.3
+gunicorn==22.0.0
+
+# Data & Machine Learning
+pandas==2.2.2
+numpy==1.26.4
+scikit-learn==1.4.2
+imbalanced-learn==0.14.0
+joblib==1.4.2
+statsmodels==0.14.2
+
+# Prophet (previsões)
+prophet==1.1.5
+
+# Visualização
+plotly==5.22.0
+
+# Utilidades
+requests==2.32.3
+python-dateutil==2.9.0.post0
+pytz==2024.1
+tzdata==2024.1
+
+# Downloads de dados
+yfinance==0.2.43
+
+# Geocodificação / clima
+geopy==2.4.1
+=======
+Flask==3.0.3
+yfinance==0.2.43
+pandas==2.2.2
+python-dateutil==2.9.0.post0
+streamlit==1.37.1
+plotly==5.22.0
+requests>=2.31.0
+numpy>=1.26.0
+scikit-learn>=1.4
+numpy>=1.26
+imbalanced-learn>=0.14.0
+>>>>>>> f7426c844b74f350f260f6b3ed7061457b6e4a48

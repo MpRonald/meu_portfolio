@@ -1,0 +1,210 @@
+{% extends 'base.html' %}
+{% block title %}Cotações{% endblock %}
+{% block content %}
+
+<div class="quotes-page fade-in-up">
+
+  <header class="quotes-header">
+    <h1>Cotações</h1>
+    <p class="muted">
+      As cotações exibidas abaixo são <strong>preços ajustados de fecho (Close)</strong> obtidos do Yahoo Finance (via yfinance).
+      Podem ter <strong>atraso</strong> em relação ao mercado e a <strong>moeda</strong> depende da bolsa do ativo.
+    </p>
+  </header>
+
+  <section class="card quotes-form-card fade-in-up">
+    <form method="get" action="{{ url_for('quotes') }}" class="quotes-form">
+
+      <div class="quotes-form-grid">
+        <label>
+          <span class="form-label-text">Selecionar por nome</span>
+          <select id="preset" name="preset" onchange="onPresetChange(this)" class="form-select">
+            <option value="">-- Escolhe um ativo --</option>
+            {% for label, tk in presets %}
+              <option value="{{ tk }}">{{ label }} — {{ tk }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label>
+          <span class="form-label-text">Ticker</span>
+          <input id="tickerInput"
+                 type="text"
+                 name="ticker"
+                 value="{{ form.ticker }}"
+                 required
+                 class="form-control" />
+        </label>
+
+        <label>
+          <span class="form-label-text">Período</span>
+          <select name="period" class="form-select">
+            {% for p in ["1d","5d","1mo","3mo","6mo","1y","2y","5y","10y","ytd","max"] %}
+              <option value="{{ p }}" {% if form.period == p %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label>
+          <span class="form-label-text">Intervalo</span>
+          <select name="interval" class="form-select">
+            {% for it in ["1m","5m","15m","1h","1d","5d","1wk","1mo","3mo"] %}
+              <option value="{{ it }}" {% if form.interval == it %}selected{% endif %}>{{ it }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label>
+          <span class="form-label-text">Algoritmo</span>
+          <select name="algoritmo" class="form-select">
+            <option value="rf" {% if form.algoritmo == 'rf' %}selected{% endif %}>Random Forest</option>
+            <option value="arima" {% if form.algoritmo == 'arima' %}selected{% endif %}>ARIMA</option>
+            <option value="prophet" {% if form.algoritmo == 'prophet' %}selected{% endif %}>Prophet</option>
+          </select>
+        </label>
+
+        <label>
+          <span class="form-label-text">Nº dias previsão</span>
+          <input type="number"
+                 min="1"
+                 max="180"
+                 name="n_days"
+                 value="{{ form.n_days }}"
+                 class="form-control">
+        </label>
+      </div>
+
+      <!-- Campo oculto usado quando o preset muda -->
+      <input type="hidden" name="preset_ticker" id="preset_ticker" value="">
+
+      <div class="form-actions">
+        <button class="button" type="submit">Atualizar</button>
+      </div>
+    </form>
+  </section>
+
+  {% if notice %}
+    <p class="muted text-center fade-in-up" style="margin-top: 0.75rem;">
+      {{ notice }}
+    </p>
+  {% endif %}
+
+  {% if error %}
+    <div class="alert alert-danger fade-in-up" style="margin-top: 0.75rem;">
+      {{ error }}
+    </div>
+  {% endif %}
+
+  {% if metrics and forecast is not none %}
+    <section class="card section-card fade-in-up">
+      <h2>Previsão — {{ form.ticker }} com {{ alg_label }}</h2>
+      <p class="muted">
+        Métricas calculadas em conjunto de teste.
+      </p>
+
+      <div class="metrics-grid">
+        <div class="metric-box"
+             data-bs-toggle="tooltip"
+             data-bs-placement="top"
+             title="MAE (Erro Médio Absoluto): média das diferenças absolutas entre o valor observado e o valor previsto. Quanto menor, melhor.">
+          <strong>MAE</strong>
+          <div class="metric-value">
+            {{ "%.6f"|format(metrics.mae) }}
+          </div>
+        </div>
+
+        <div class="metric-box"
+             data-bs-toggle="tooltip"
+             data-bs-placement="top"
+             title="RMSE (Raiz do Erro Quadrático Médio): penaliza mais fortemente erros grandes. Sensível a outliers. Quanto menor, melhor.">
+          <strong>RMSE</strong>
+          <div class="metric-value">
+            {{ "%.6f"|format(metrics.rmse) }}
+          </div>
+        </div>
+
+        <div class="metric-box"
+             data-bs-toggle="tooltip"
+             data-bs-placement="top"
+             title="MAPE (Erro Percentual Médio Absoluto): média do erro absoluto em percentagem do valor real. Útil para comparar modelos em diferentes escalas.">
+          <strong>MAPE (%)</strong>
+          <div class="metric-value">
+            {{ "%.3f"|format(metrics.mape) }}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card section-card fade-in-up">
+      <h3>Histórico recente + previsão (modelo)</h3>
+      <p class="muted">
+        Gráfico Plotly com o último ano de dados e a previsão para os próximos {{ form.n_days }} dias.
+      </p>
+      <div>
+        {{ stock_plot_div | safe }}
+      </div>
+    </section>
+
+    <section class="card section-card fade-in-up">
+      <h3>Previsão — próximos {{ form.n_days }} dias</h3>
+      <p class="muted">
+        Valores previstos para o preço de {{ form.ticker }}.
+      </p>
+
+      <div class="forecast-table-container">
+        <div class="forecast-table-inner">
+          <table class="table">
+            <thead>
+              <tr>
+                <th style="text-align:left; white-space:nowrap;">
+                  Data
+                </th>
+                <th style="text-align:right; white-space:nowrap;">
+                  Preço previsto
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for dt, row in forecast.iterrows() %}
+                <tr>
+                  <td style="white-space:nowrap;">
+                    {{ dt.date().isoformat() }}
+                  </td>
+                  <td style="text-align:right; white-space:nowrap;">
+                    {{ "%.3f"|format(row.forecast_rate) }}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  {% endif %}
+
+</div>
+
+<script>
+  // Função de preset (global)
+  function onPresetChange(sel) {
+    const tk = sel.value;
+    if (!tk) return;
+    document.getElementById('tickerInput').value = tk;
+    document.getElementById('preset_ticker').value = tk;
+    sel.form.submit();
+  }
+
+  // Inicializar tooltips do Bootstrap
+  document.addEventListener('DOMContentLoaded', function () {
+    if (window.bootstrap) {
+      var tooltipTriggerList = [].slice.call(
+        document.querySelectorAll('[data-bs-toggle="tooltip"]')
+      );
+      tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+        new bootstrap.Tooltip(tooltipTriggerEl);
+      });
+    }
+  });
+</script>
+
+{% endblock %}
