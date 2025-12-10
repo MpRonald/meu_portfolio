@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import os
 from datetime import datetime
 from io import StringIO
@@ -2670,7 +2669,6 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     app.run(host="0.0.0.0", port=port)
 
-=======
 import os
 from datetime import datetime
 from io import StringIO
@@ -5268,4 +5266,4 @@ def healthz():
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
->>>>>>> f7426c844b74f350f260f6b3ed7061457b6e4a48
+
