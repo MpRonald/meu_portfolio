@@ -37,7 +37,6 @@ from scipy import stats
 
 # ------------------ Time series ------------------
 from statsmodels.tsa.arima.model import ARIMA
-from prophet import Prophet
 
 # ------------------ Plotly ------------------
 import plotly
@@ -433,6 +432,7 @@ def fx_train_and_forecast_arima(series: pd.Series, n_days: int):
 
 
 def fx_train_and_forecast_prophet(series: pd.Series, n_days: int):
+    from prophet import Prophet
     if len(series) < 80:
         raise ValueError("Dados insuficientes para treinar Prophet (menos de 80 observações).")
 
@@ -1128,6 +1128,7 @@ def index():
 
 @app.route("/fx", methods=["GET", "POST"])
 def fx():
+    from prophet import Prophet
     erro = None
     resultado = None
 
