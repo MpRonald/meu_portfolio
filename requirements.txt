@@ -1,17 +1,20 @@
 Flask==3.0.3
 gunicorn==22.0.0
+Werkzeug==3.0.3
 
 pandas==2.2.2
-numpy==1.26.4
-python-dateutil==2.9.0.post0
-
-yfinance==0.2.43
+numpy==2.0.1
 requests==2.32.3
+yfinance==0.2.43
 
-scikit-learn==1.5.2
-imbalanced-learn==0.12.3
-
+scikit-learn==1.5.1
+joblib==1.4.2
+scipy==1.14.0
 statsmodels==0.14.2
+
+plotly==5.23.0
 prophet==1.1.5
 
-plotly==5.24.1
+
+setuptools>=70.0.0
+wheel>=0.43.0
