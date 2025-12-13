@@ -2,7 +2,7 @@
 nixPkgs = ["python311", "gcc"]
 
 [phases.install]
-cmds = [
-  "python -m pip install -U pip",
-  "pip install --no-cache-dir -r requirements.txt"
-]
+cmds = ["pip install -r requirements.txt"]
+
+[start]
+cmd = "gunicorn app:app"
