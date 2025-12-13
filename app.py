@@ -137,7 +137,7 @@ def create_app() -> Flask:
             "status": "ok",
             "time": datetime.utcnow().isoformat() + "Z",
             "env": app.config.get("ENV_NAME"),
-        })
+        }),200
 
     return app
 
