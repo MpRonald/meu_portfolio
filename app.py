@@ -1760,6 +1760,577 @@ def ames_dashboard():
         nomes_faixa=NOMES_FAIXA,
     )
 
+# ============================================================
+# ==== E-COMMERCE DASHBOARDS =================================
+# ============================================================
+
+@app.route("/ecom", methods=["GET"])
+def ecom_dashboard():
+    """
+    Dashboard de vendas da loja online.
+    Mostra KPIs + filtros + gráficos de receita mensal, top produtos e top países.
+    """
+    erro = ECOM_LOAD_ERROR
+    kpis = None
+    revenue_plot_div = None
+    products_plot_div = None
+    countries_plot_div = None
+    top_products_table = None
+    top_countries_table = None
+
+    # Filtros vindos da query string (?start_date=...&end_date=...)
+    filtros = {
+        "start_date": request.args.get("start_date", "").strip(),
+        "end_date": request.args.get("end_date", "").strip(),
+        "country": request.args.get("country", "").strip(),
+        "product": request.args.get("product", "").strip(),
+    }
+
+    # Listas para os <select>
+    countries_list = []
+    products_list = []
+
+    if ECOM_DF is not None:
+        if "Country" in ECOM_DF.columns:
+            countries_list = sorted(ECOM_DF["Country"].dropna().unique().tolist())
+        if "Description" in ECOM_DF.columns:
+            products_list = sorted(ECOM_DF["Description"].dropna().unique().tolist())
+
+    if ECOM_DF is not None and erro is None:
+        df = ECOM_DF.copy()
+
+        # ----- Aplicar filtros -----
+        if filtros["start_date"]:
+            try:
+                dt_ini = pd.to_datetime(filtros["start_date"])
+                df = df[df["InvoiceDate"] >= dt_ini]
+            except Exception:
+                pass
+
+        if filtros["end_date"]:
+            try:
+                dt_fim = pd.to_datetime(filtros["end_date"])
+                df = df[df["InvoiceDate"] <= dt_fim]
+            except Exception:
+                pass
+
+        if filtros["country"]:
+            df = df[df["Country"] == filtros["country"]]
+
+        if filtros["product"]:
+            df = df[df["Description"] == filtros["product"]]
+
+        if df.empty:
+            erro = "Nenhum dado encontrado para os filtros selecionados."
+        else:
+            # ----- KPIs -----
+            total_revenue = float(df["TotalPrice"].sum())
+            num_orders = int(df["InvoiceNo"].nunique())
+            num_customers = int(df["CustomerID"].nunique())
+            total_qty = float(df["Quantity"].sum())
+
+            avg_ticket = float(total_revenue / num_orders) if num_orders > 0 else 0.0
+            avg_items_per_order = float(total_qty / num_orders) if num_orders > 0 else 0.0
+            avg_revenue_per_customer = float(total_revenue / num_customers) if num_customers > 0 else 0.0
+
+            first_date = pd.to_datetime(df["InvoiceDate"].min())
+            last_date = pd.to_datetime(df["InvoiceDate"].max())
+            period_days = max((last_date - first_date).days + 1, 1)
+            avg_daily_revenue = float(total_revenue / period_days) if period_days > 0 else 0.0
+
+            kpis = {
+                "total_revenue": total_revenue,
+                "num_orders": num_orders,
+                "num_customers": num_customers,
+                "avg_ticket": avg_ticket,
+                "avg_items_per_order": avg_items_per_order,
+                "avg_revenue_per_customer": avg_revenue_per_customer,
+                "period_days": period_days,
+                "avg_daily_revenue": avg_daily_revenue,
+            }
+
+            # ----- Receita mensal -----
+            df_month = (
+                df.set_index("InvoiceDate")
+                  .resample("M")["TotalPrice"]
+                  .sum()
+                  .reset_index()
+            )
+            df_month["MonthStr"] = df_month["InvoiceDate"].dt.strftime("%Y-%m")
+
+            fig_rev = go.Figure()
+            fig_rev.add_trace(
+                go.Scatter(
+                    x=df_month["MonthStr"],
+                    y=df_month["TotalPrice"],
+                    mode="lines",
+                    name="Receita mensal",
+                    line=dict(width=2),
+                )
+            )
+            fig_rev.update_layout(
+                title="Receita mensal",
+                xaxis_title="Mês",
+                yaxis_title="Receita",
+                margin=dict(l=40, r=20, t=40, b=40),
+                template="plotly_white",
+                height=350,
+                hovermode="x unified",
+                paper_bgcolor="white",
+                plot_bgcolor="white",
+            )
+            fig_rev.update_yaxes(tickformat=".2f")
+            revenue_plot_div = plot(fig_rev, include_plotlyjs="cdn", output_type="div")
+
+            # ----- Top 10 produtos por receita -----
+            top_products = (
+                df.groupby("Description", as_index=False)["TotalPrice"]
+                .sum()
+                .sort_values("TotalPrice", ascending=False)
+                .head(10)
+            )
+            plot_top_products = top_products.sort_values("TotalPrice", ascending=True)
+
+            fig_prod = go.Figure()
+            fig_prod.add_trace(
+                go.Bar(
+                    x=plot_top_products["TotalPrice"],
+                    y=plot_top_products["Description"],
+                    orientation="h",
+                    name="Receita por produto",
+                )
+            )
+            fig_prod.update_layout(
+                title="Top 10 produtos por receita",
+                xaxis_title="Receita",
+                yaxis_title="Produto",
+                margin=dict(l=120, r=20, t=40, b=40),
+                template="plotly_white",
+                height=450,
+                paper_bgcolor="white",
+                plot_bgcolor="white",
+            )
+            products_plot_div = plot(fig_prod, include_plotlyjs=False, output_type="div")
+            top_products_table = top_products.to_dict(orient="records")
+
+            # ----- Top 10 países por receita -----
+            top_countries = (
+                df.groupby("Country", as_index=False)["TotalPrice"]
+                  .sum()
+                  .sort_values("TotalPrice", ascending=False)
+                  .head(10)
+            )
+
+            fig_ctry = go.Figure()
+            fig_ctry.add_trace(
+                go.Bar(
+                    x=top_countries["Country"],
+                    y=top_countries["TotalPrice"],
+                    name="Receita por país",
+                )
+            )
+            fig_ctry.update_layout(
+                title="Top 10 países por receita",
+                xaxis_title="País",
+                yaxis_title="Receita",
+                margin=dict(l=40, r=20, t=40, b=40),
+                template="plotly_white",
+                height=350,
+                paper_bgcolor="white",
+                plot_bgcolor="white",
+            )
+            countries_plot_div = plot(fig_ctry, include_plotlyjs=False, output_type="div")
+            top_countries_table = top_countries.to_dict(orient="records")
+
+    return safe_render(
+        "ecom.html",
+        erro=erro,
+        kpis=kpis,
+        revenue_plot_div=revenue_plot_div,
+        products_plot_div=products_plot_div,
+        countries_plot_div=countries_plot_div,
+        top_products_table=top_products_table,
+        top_countries_table=top_countries_table,
+        filtros=filtros,
+        countries=countries_list,
+        products=products_list,
+    )
+
+
+@app.route("/ecom/rfm", methods=["GET"])
+def ecom_rfm():
+    """
+    Análise RFM (Recency, Frequency, Monetary) por cliente + segmentação.
+    """
+    erro = ECOM_LOAD_ERROR
+    rfm_table = None
+    seg_summary = None
+    seg_plot_div = None
+
+    filtros = {"country": request.args.get("country", "").strip()}
+
+    countries_list = []
+    if ECOM_DF is not None:
+        countries_list = sorted(ECOM_DF["Country"].dropna().unique().tolist())
+
+    if ECOM_DF is not None and erro is None:
+        df = ECOM_DF.copy()
+        df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"])
+
+        if filtros["country"]:
+            df = df[df["Country"] == filtros["country"]]
+
+        df = df.dropna(subset=["CustomerID"])
+
+        if df.empty:
+            erro = "Nenhum dado encontrado para os filtros selecionados."
+        else:
+            ref_date = df["InvoiceDate"].max()
+
+            rfm = (
+                df.groupby("CustomerID")
+                  .agg(
+                      Recency=("InvoiceDate", lambda x: (ref_date - x.max()).days),
+                      Frequency=("InvoiceNo", "nunique"),
+                      Monetary=("TotalPrice", "sum"),
+                  )
+                  .reset_index()
+            )
+
+            if rfm.empty:
+                erro = "Não foi possível calcular RFM (sem clientes válidos)."
+            else:
+                try:
+                    rfm["R_score"] = pd.qcut(rfm["Recency"], 4, labels=[4, 3, 2, 1]).astype(int)
+                except Exception:
+                    rfm["R_score"] = 2
+
+                try:
+                    rfm["F_score"] = pd.qcut(rfm["Frequency"], 4, labels=[1, 2, 3, 4]).astype(int)
+                except Exception:
+                    rfm["F_score"] = 2
+
+                try:
+                    rfm["M_score"] = pd.qcut(rfm["Monetary"], 4, labels=[1, 2, 3, 4]).astype(int)
+                except Exception:
+                    rfm["M_score"] = 2
+
+                rfm["RFM_score"] = (rfm["R_score"] + rfm["F_score"] + rfm["M_score"])
+
+                def _segment(row):
+                    s = row["RFM_score"]
+                    if s >= 10:
+                        return "Clientes VIP"
+                    elif s >= 8:
+                        return "Clientes Leais"
+                    elif s >= 5:
+                        return "Em crescimento"
+                    else:
+                        return "Em risco"
+
+                rfm["Segment"] = rfm.apply(_segment, axis=1)
+
+                seg_summary_df = (
+                    rfm.groupby("Segment", as_index=False)
+                       .agg(
+                           num_customers=("CustomerID", "nunique"),
+                           avg_recency=("Recency", "mean"),
+                           avg_frequency=("Frequency", "mean"),
+                           total_monetary=("Monetary", "sum"),
+                       )
+                       .sort_values("total_monetary", ascending=False)
+                )
+                seg_summary = seg_summary_df.to_dict(orient="records")
+
+                fig_seg = go.Figure()
+                fig_seg.add_trace(go.Bar(
+                    x=seg_summary_df["Segment"],
+                    y=seg_summary_df["num_customers"],
+                    name="Nº de clientes",
+                ))
+                fig_seg.update_layout(
+                    title="Distribuição de clientes por segmento RFM",
+                    xaxis_title="Segmento",
+                    yaxis_title="Nº de clientes",
+                    margin=dict(l=40, r=20, t=40, b=40),
+                    template="plotly_white",
+                    height=350,
+                    paper_bgcolor="white",
+                    plot_bgcolor="white",
+                )
+                seg_plot_div = plot(fig_seg, include_plotlyjs="cdn", output_type="div")
+
+                rfm_table = (
+                    rfm.sort_values(["RFM_score", "Monetary"], ascending=[False, False])
+                       .head(200)
+                       .to_dict(orient="records")
+                )
+
+    return safe_render(
+        "ecom_rfm.html",
+        erro=erro,
+        filtros=filtros,
+        countries=countries_list,
+        seg_plot_div=seg_plot_div,
+        seg_summary=seg_summary,
+        rfm_table=rfm_table,
+    )
+
+
+@app.route("/ecom/forecast", methods=["GET"])
+def ecom_forecast():
+    """
+    Previsão de receita mensal usando Prophet.
+    """
+    erro = ECOM_LOAD_ERROR
+    kpis = None
+    forecast_plot_div = None
+
+    periods_raw = request.args.get("periods", "12")
+    try:
+        periods = int(periods_raw)
+    except Exception:
+        periods = 12
+    periods = max(1, min(36, periods))
+
+    if ECOM_DF is not None and erro is None:
+        df = ECOM_DF.copy()
+        df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"])
+
+        df_month = (
+            df.set_index("InvoiceDate")
+              .resample("M")["TotalPrice"]
+              .sum()
+              .reset_index()
+        )
+
+        if df_month.empty or len(df_month) < 6:
+            erro = "Poucos dados mensais para treinar o modelo de previsão."
+        else:
+            from prophet import Prophet
+
+            df_prophet = df_month.rename(columns={"InvoiceDate": "ds", "TotalPrice": "y"})
+
+            m = Prophet()
+            m.fit(df_prophet)
+
+            future = m.make_future_dataframe(periods=periods, freq="M")
+            forecast = m.predict(future)
+
+            last_ds = df_prophet["ds"].max()
+            hist_mask = forecast["ds"] <= last_ds
+            fut_mask = forecast["ds"] > last_ds
+
+            fut = forecast.loc[fut_mask, ["ds", "yhat"]].copy()
+            fut["MonthStr"] = fut["ds"].dt.strftime("%Y-%m")
+
+            fig = go.Figure()
+
+            fig.add_trace(go.Bar(
+                x=df_prophet["ds"].dt.strftime("%Y-%m"),
+                y=df_prophet["y"],
+                name="Receita real (mensal)",
+            ))
+
+            if not fut.empty:
+                fig.add_trace(go.Scatter(
+                    x=fut["MonthStr"],
+                    y=fut["yhat"],
+                    mode="lines",
+                    name="Previsão (yhat)",
+                    line=dict(width=2, dash="dash"),
+                ))
+
+            fig.update_layout(
+                title=f"Receita mensal e previsão ({periods} meses à frente)",
+                xaxis_title="Mês",
+                yaxis_title="Receita",
+                margin=dict(l=40, r=20, t=40, b=40),
+                template="plotly_white",
+                height=400,
+                hovermode="x unified",
+                paper_bgcolor="white",
+                plot_bgcolor="white",
+            )
+            fig.update_yaxes(tickformat=".2f")
+
+            forecast_plot_div = plot(fig, include_plotlyjs="cdn", output_type="div")
+
+            df_sorted = df_prophet.sort_values("ds").reset_index(drop=True)
+
+            last12_hist = df_sorted.tail(12)
+            last12_revenue = float(last12_hist["y"].sum())
+
+            next12_fut = fut.sort_values("ds").head(12)
+            next12_revenue = float(next12_fut["yhat"].sum()) if not next12_fut.empty else None
+
+            cagr = None
+            try:
+                first_val = float(df_sorted["y"].iloc[0])
+                last_val = float(df_sorted["y"].iloc[-1])
+                years = (df_sorted["ds"].iloc[-1] - df_sorted["ds"].iloc[0]).days / 365.25
+                if years > 0 and first_val > 0:
+                    cagr = (last_val / first_val) ** (1 / years) - 1
+            except Exception:
+                cagr = None
+
+            avg_monthly_hist = float(df_sorted["y"].mean())
+            avg_monthly_forecast = float(next12_fut["yhat"].mean()) if not next12_fut.empty else None
+
+            kpis = {
+                "periods": periods,
+                "last12_revenue": last12_revenue,
+                "next12_revenue": next12_revenue,
+                "cagr": cagr,
+                "avg_monthly_hist": avg_monthly_hist,
+                "avg_monthly_forecast": avg_monthly_forecast,
+            }
+
+    return safe_render(
+        "ecom_forecast.html",
+        erro=erro,
+        kpis=kpis,
+        periods=periods,
+        forecast_plot_div=forecast_plot_div,
+    )
+
+
+@app.route("/ecom/clusters", methods=["GET"])
+def ecom_clusters():
+    """
+    Clusterização de clientes com K-Means usando RFM (Recency, Frequency, Monetary).
+    """
+    erro = ECOM_LOAD_ERROR
+    cluster_scatter_div = None
+    cluster_bar_div = None
+    cluster_summary = None
+    cluster_table = None
+
+    filtros = {"country": request.args.get("country", "").strip()}
+
+    try:
+        k = int(request.args.get("k", "4"))
+    except Exception:
+        k = 4
+    k = max(2, min(8, k))
+
+    countries_list = []
+    if ECOM_DF is not None:
+        countries_list = sorted(ECOM_DF["Country"].dropna().unique().tolist())
+
+    if ECOM_DF is not None and erro is None:
+        df = ECOM_DF.copy()
+        df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"])
+
+        if filtros["country"]:
+            df = df[df["Country"] == filtros["country"]]
+
+        df = df.dropna(subset=["CustomerID"])
+        if df.empty:
+            erro = "Nenhum dado encontrado para os filtros selecionados."
+        else:
+            ref_date = df["InvoiceDate"].max()
+
+            rfm = (
+                df.groupby("CustomerID")
+                  .agg(
+                      Recency=("InvoiceDate", lambda x: (ref_date - x.max()).days),
+                      Frequency=("InvoiceNo", "nunique"),
+                      Monetary=("TotalPrice", "sum"),
+                  )
+                  .reset_index()
+            )
+
+            rfm = rfm[(rfm["Monetary"] > 0) & (rfm["Frequency"] > 0)]
+            if rfm.empty:
+                erro = "Não foi possível calcular clusters (sem clientes válidos após filtragem)."
+            else:
+                X = rfm[["Recency", "Frequency", "Monetary"]].copy()
+
+                scaler = StandardScaler()
+                X_scaled = scaler.fit_transform(X)
+
+                km = KMeans(
+                    n_clusters=k,
+                    random_state=42,
+                    n_init=10,
+                )
+                rfm["Cluster"] = km.fit_predict(X_scaled)
+
+                cluster_summary_df = (
+                    rfm.groupby("Cluster", as_index=False)
+                       .agg(
+                           num_customers=("CustomerID", "nunique"),
+                           avg_recency=("Recency", "mean"),
+                           avg_frequency=("Frequency", "mean"),
+                           avg_monetary=("Monetary", "mean"),
+                           total_monetary=("Monetary", "sum"),
+                       )
+                       .sort_values("total_monetary", ascending=False)
+                )
+                cluster_summary = cluster_summary_df.to_dict(orient="records")
+
+                fig_bar = go.Figure()
+                fig_bar.add_trace(go.Bar(
+                    x=[f"Cluster {int(c)}" for c in cluster_summary_df["Cluster"]],
+                    y=cluster_summary_df["num_customers"],
+                    name="Nº de clientes",
+                ))
+                fig_bar.update_layout(
+                    title=f"Distribuição de clientes por cluster (k={k})",
+                    xaxis_title="Cluster",
+                    yaxis_title="Nº de clientes",
+                    margin=dict(l=40, r=20, t=40, b=40),
+                    template="plotly_white",
+                    height=350,
+                    paper_bgcolor="white",
+                    plot_bgcolor="white",
+                )
+                cluster_bar_div = plot(fig_bar, include_plotlyjs="cdn", output_type="div")
+
+                fig_scatter = go.Figure()
+                fig_scatter.add_trace(go.Scatter(
+                    x=rfm["Frequency"],
+                    y=rfm["Monetary"],
+                    mode="markers",
+                    text=[f"Cliente {cid}" for cid in rfm["CustomerID"]],
+                    marker=dict(
+                        size=7,
+                        color=rfm["Cluster"],
+                        colorscale="Viridis",
+                        showscale=True,
+                    ),
+                ))
+                fig_scatter.update_layout(
+                    title=f"Clusters de clientes (Frequency x Monetary) — k={k}",
+                    xaxis_title="Frequency (nº de encomendas)",
+                    yaxis_title="Monetary (receita total)",
+                    margin=dict(l=40, r=20, t=40, b=40),
+                    template="plotly_white",
+                    height=400,
+                    paper_bgcolor="white",
+                    plot_bgcolor="white",
+                )
+                cluster_scatter_div = plot(fig_scatter, include_plotlyjs=False, output_type="div")
+
+                cluster_table = (
+                    rfm.sort_values(["Cluster", "Monetary"], ascending=[True, False])
+                       .head(300)
+                       .to_dict(orient="records")
+                )
+
+    return safe_render(
+        "ecom_clusters.html",
+        erro=erro,
+        filtros=filtros,
+        countries=countries_list,
+        k=k,
+        cluster_bar_div=cluster_bar_div,
+        cluster_scatter_div=cluster_scatter_div,
+        cluster_summary=cluster_summary,
+        cluster_table=cluster_table,
+    )
+
 
 # ============================================================
 # ==== Entrypoint local (produção Railway usa gunicorn) ======
