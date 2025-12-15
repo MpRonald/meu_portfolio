@@ -416,17 +416,26 @@ def create_app() -> Flask:
         graph_map_json = None
         if "latitude" in df_filtrado.columns and "longitude" in df_filtrado.columns:
             df_map = df_filtrado.dropna(subset=["latitude", "longitude"]).copy()
+
+            # Performance: limitar pontos
+            MAX_PONTOS = 2500
+            if len(df_map) > MAX_PONTOS:
+                df_map = df_map.sample(MAX_PONTOS, random_state=42)
+
             if len(df_map) > 0:
                 fig_map = px.scatter_geo(
                     df_map,
                     lat="latitude",
                     lon="longitude",
                     color="faixa_preco" if "faixa_preco" in df_map.columns else None,
-                    size="preco" if "preco" in df_map.columns else None,
-                    title="Mapa de imóveis",
+                    title=f"Mapa de imóveis (amostra até {MAX_PONTOS} pontos)",
                 )
-                fig_map.update_layout(height=520)
-                graph_map_json = json.dumps(fig_map, cls=plotly.utils.PlotlyJSONEncoder)
+
+        # Bolinhas pequenas + leves
+        fig_map.update_traces(marker=dict(size=6, opacity=0.65))
+        fig_map.update_layout(height=520)
+
+        graph_map_json = json.dumps(fig_map, cls=plotly.utils.PlotlyJSONEncoder)
 
         # bairro (opcional)
         graph_box_bairro_json = None
