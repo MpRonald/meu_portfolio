@@ -1,4 +1,3 @@
-# services.py
 import requests
 from functools import lru_cache
 from pathlib import Path
@@ -80,18 +79,40 @@ class PortfolioService:
 
         df = pd.read_csv(csv_path)
 
-        # tenta garantir tipos numéricos nas colunas numéricas mais usadas
+        # tenta garantir tipos numéricos em colunas que façam sentido
         for c in df.columns:
             if c in {"faixa_preco", "bairro", "Neighborhood"}:
                 continue
-            # tenta converter o que for possível
             if df[c].dtype == object:
-                df[c] = pd.to_numeric(df[c], errors="ignore")
+                # converter o que der; se não der, mantém
+                converted = pd.to_numeric(df[c], errors="coerce")
+                # se converteu alguma coisa, usa; senão mantém original
+                if converted.notna().sum() > 0:
+                    df[c] = converted
 
         return df
 
     def calcular_estatisticas_1d(self, serie: pd.Series) -> Dict[str, Any]:
         s = serie.dropna()
+
+        if len(s) == 0:
+            return {
+                "n": 0,
+                "media": None,
+                "mediana": None,
+                "moda": None,
+                "minimo": None,
+                "maximo": None,
+                "variancia": None,
+                "desvio_padrao": None,
+                "q1": None,
+                "q3": None,
+                "iqr": None,
+                "assimetria": None,
+                "curtose": None,
+                "stat_shapiro": None,
+                "p_valor_shapiro": None,
+            }
 
         media = float(s.mean())
         mediana = float(s.median())
@@ -193,7 +214,7 @@ class PortfolioService:
             resultados["corr_spearman_r"] = None
             resultados["corr_spearman_p"] = None
 
-        # Kruskal–Wallis por faixa_preco
+        # Kruskal–Wallis por faixa_preco (só quando sem filtro: df_completo não None)
         if df_completo is not None and "faixa_preco" in df_completo.columns and var in df_completo.columns:
             grupos = []
             for faixa in sorted(df_completo["faixa_preco"].dropna().unique().tolist()):

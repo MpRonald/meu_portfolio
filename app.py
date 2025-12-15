@@ -63,7 +63,7 @@ NOMES_FAIXA = {
     "baixo": "Preço Baixo",
     "medio": "Preço Médio",
     "alto": "Preço Alto",
-    "muito_alto": "Preço Muito Alto"
+    "muito_alto": "Preço Muito Alto",
 }
 
 
@@ -106,7 +106,7 @@ def create_app() -> Flask:
 
     _configure_logging(app)
 
-    # service com acesso ao DATA_DIR
+    # Service com acesso ao DATA_DIR
     service = PortfolioService(timeout=30, data_dir=app.config["DATA_DIR"])
 
     @app.after_request
@@ -153,8 +153,25 @@ def create_app() -> Flask:
     def index():
         return safe_render("index.html")
 
-    # ---- stubs do ecom (para não quebrar o index.html) ----
-        # ---------- STUBS para não rebentar o index.html ----------
+    # =========================
+    # STUBS (para não quebrar o index.html)
+    # =========================
+    @app.route("/ecom")
+    def ecom_dashboard():
+        return safe_render("ecom.html", erro="(Em construção) A migrar para o novo app.")
+
+    @app.route("/ecom/rfm")
+    def ecom_rfm():
+        return safe_render("ecom_rfm.html", erro="(Em construção) A migrar para o novo app.")
+
+    @app.route("/ecom/forecast")
+    def ecom_forecast():
+        return safe_render("ecom_forecast.html", erro="(Em construção) A migrar para o novo app.")
+
+    @app.route("/ecom/clusters")
+    def ecom_clusters():
+        return safe_render("ecom_clusters.html", erro="(Em construção) A migrar para o novo app.")
+
     @app.route("/quotes")
     def quotes():
         return safe_render("quotes.html", erro="(Em construção) A migrar para o novo app.")
@@ -285,10 +302,11 @@ def create_app() -> Flask:
         df_completo = service.load_ames_data()
         df = df_completo.copy()
 
-        # escolher variáveis numéricas que existam
+        # variáveis numéricas preferidas
         numeric_cols = [c for c in COLUNAS_PROJETO if c in df.columns and c != "faixa_preco"]
+
+        # fallback: quaisquer numéricas do CSV
         if not numeric_cols:
-            # fallback: quaisquer colunas numéricas do CSV
             numeric_cols = df.select_dtypes(include="number").columns.tolist()
 
         if not numeric_cols:
@@ -384,7 +402,6 @@ def create_app() -> Flask:
             graph_preco_ano_json = json.dumps(fig_preco_ano, cls=plotly.utils.PlotlyJSONEncoder)
 
         graph_heatmap_json = None
-        # matriz de correlação: usar só numéricas comuns
         corr_cols = [c for c in ["preco", "preco_m2", "area_habitavel", "area_total", "quartos", "banheiros"] if c in df_filtrado.columns]
         if len(corr_cols) >= 2:
             corr = df_filtrado[corr_cols].corr(numeric_only=True)
@@ -415,6 +432,7 @@ def create_app() -> Flask:
         graph_box_bairro_json = None
         graph_bar_bairro_json = None
         bairro_col = "bairro" if "bairro" in df_filtrado.columns else ("Neighborhood" if "Neighborhood" in df_filtrado.columns else None)
+
         if bairro_col and "preco" in df_filtrado.columns:
             top = (
                 df_filtrado[[bairro_col, "preco"]]
@@ -449,7 +467,6 @@ def create_app() -> Flask:
                 fig_bar_bairro.update_layout(xaxis_tickangle=-45)
                 graph_bar_bairro_json = json.dumps(fig_bar_bairro, cls=plotly.utils.PlotlyJSONEncoder)
 
-        # interpretação Shapiro
         interpretacao_normalidade = None
         if stats_dict.get("p_valor_shapiro") is not None:
             alpha = 0.05
@@ -491,7 +508,6 @@ def create_app() -> Flask:
 
 
 app = create_app()
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8000"))
