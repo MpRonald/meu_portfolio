@@ -154,21 +154,30 @@ def create_app() -> Flask:
         return safe_render("index.html")
 
     # ---- stubs do ecom (para não quebrar o index.html) ----
-    @app.route("/ecom")
-    def ecom_dashboard():
-        return safe_render("ecom.html", erro="(Em construção) A migrar para o novo app.", kpis=None)
+        # ---------- STUBS para não rebentar o index.html ----------
+    @app.route("/quotes")
+    def quotes():
+        return safe_render("quotes.html", erro="(Em construção) A migrar para o novo app.")
 
-    @app.route("/ecom/rfm")
-    def ecom_rfm():
-        return safe_render("ecom_rfm.html", erro="(Em construção) A migrar para o novo app.", rfm_table=None)
+    @app.route("/fx")
+    def fx():
+        return safe_render("fx.html", erro="(Em construção) A migrar para o novo app.")
 
-    @app.route("/ecom/forecast")
-    def ecom_forecast():
-        return safe_render("ecom_forecast.html", erro="(Em construção) A migrar para o novo app.", kpis=None)
+    @app.route("/ml/heart")
+    def ml_heart():
+        return safe_render("ml_heart.html", erro="(Em construção) A migrar para o novo app.")
 
-    @app.route("/ecom/clusters")
-    def ecom_clusters():
-        return safe_render("ecom_clusters.html", erro="(Em construção) A migrar para o novo app.", cluster_summary=None)
+    @app.route("/nlp/supervised")
+    def nlp_supervised():
+        return safe_render("nlp_supervised.html", erro="(Em construção) A migrar para o novo app.")
+
+    @app.route("/loan")
+    def loan_form():
+        return safe_render("loan.html", erro="(Em construção) A migrar para o novo app.")
+
+    @app.route("/churn/xai")
+    def churn_xai_dashboard():
+        return safe_render("churn_xai.html", erro="(Em construção) A migrar para o novo app.")
 
     # =========================
     # WEATHER
