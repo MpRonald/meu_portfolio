@@ -39,32 +39,33 @@ COLUNAS_PROJETO = [
 ]
 
 NOMES_AMIGAVEIS = {
-    "preco": "Preço do Imóvel (€)",
-    "quartos": "Número de Quartos",
-    "banheiros": "Número de WC",
-    "area_habitavel": "Área Habitável (m²)",
-    "area_lote": "Área do Lote (m²)",
-    "andares": "Número de Andares",
-    "area_acima_solo": "Área acima do Solo (m²)",
-    "area_porao": "Área da Cave/PORÃO (m²)",
-    "ano_construcao": "Ano de Construção",
+    "preco": "Property Price (€)",
+    "quartos": "Bedrooms",
+    "banheiros": "Bathrooms",
+    "area_habitavel": "Living Area (m²)",
+    "area_lote": "Lot Area (m²)",
+    "andares": "Number of Floors",
+    "area_acima_solo": "Above-Ground Area (m²)",
+    "area_porao": "Basement Area (m²)",
+    "ano_construcao": "Year Built",
     "latitude": "Latitude",
     "longitude": "Longitude",
-    "area_habitavel_viz": "Área Habitável Média dos Vizinhos (m²)",
-    "area_lote_viz": "Área do Lote Média dos Vizinhos (m²)",
-    "faixa_preco": "Faixa de Preço",
-    "idade_imovel": "Idade do Imóvel (anos)",
-    "area_total": "Área Total (m²)",
-    "densidade_construcao": "Densidade de Construção",
-    "preco_m2": "Preço por m² (€)",
+    "area_habitavel_viz": "Neighborhood Avg Living Area (m²)",
+    "area_lote_viz": "Neighborhood Avg Lot Area (m²)",
+    "faixa_preco": "Price Range",
+    "idade_imovel": "Property Age (years)",
+    "area_total": "Total Area (m²)",
+    "densidade_construcao": "Build Density",
+    "preco_m2": "Price per m² (€)",
 }
 
 NOMES_FAIXA = {
-    "baixo": "Preço Baixo",
-    "medio": "Preço Médio",
-    "alto": "Preço Alto",
-    "muito_alto": "Preço Muito Alto",
+    "baixo": "Low Price",
+    "medio": "Medium Price",
+    "alto": "High Price",
+    "muito_alto": "Very High Price",
 }
+
 
 
 def _configure_logging(app: Flask) -> None:
