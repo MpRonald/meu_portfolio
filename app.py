@@ -66,6 +66,13 @@ NOMES_FAIXA = {
     "muito_alto": "Very High Price",
 }
 
+PRICE_RANGE_EN = {
+    "baixo": "Low",
+    "medio": "Medium",
+    "alto": "High",
+    "muito_alto": "Very High",
+}
+
 
 
 def _configure_logging(app: Flask) -> None:
@@ -298,6 +305,8 @@ def create_app() -> Flask:
     # =========================
     # AMES
     # =========================
+    # =========================
+
     @app.route("/ames", methods=["GET", "POST"])
     def ames_dashboard():
         df_completo = service.load_ames_data()
@@ -313,7 +322,6 @@ def create_app() -> Flask:
         if not numeric_cols:
             return jsonify({"error": "No numeric columns available in the Ames dataset."}), 500
 
-
         # ensure friendly names exist for all listed variables
         nomes_amig = dict(NOMES_AMIGAVEIS)
         for c in numeric_cols:
@@ -322,12 +330,14 @@ def create_app() -> Flask:
         default_var = "preco" if "preco" in numeric_cols else numeric_cols[0]
         var = request.form.get("variavel", default_var)
 
+        # price ranges list (keeps your existing "Todos" flow intact)
         faixas_unicas = ["Todos"]
         if "faixa_preco" in df.columns:
             faixas_unicas += sorted(df["faixa_preco"].dropna().unique().tolist())
 
         faixa_selecionada = request.form.get("faixa_preco", "Todos")
 
+        # filter data by price range (keeps original values: baixo/medio/alto/muito_alto)
         df_filtrado = df.copy()
         if faixa_selecionada != "Todos" and "faixa_preco" in df_filtrado.columns:
             df_filtrado = df_filtrado[df_filtrado["faixa_preco"] == faixa_selecionada]
@@ -347,17 +357,27 @@ def create_app() -> Flask:
 
         label = nomes_amig.get(var, var)
 
-    # --- base charts (always) ---
+        # =========================================
+        # Create a plot-only dataframe for English legends
+        # =========================================
+        df_plot = df_filtrado.copy()
+        if "faixa_preco" in df_plot.columns:
+            df_plot["price_range_en"] = df_plot["faixa_preco"].map(PRICE_RANGE_EN).fillna(df_plot["faixa_preco"])
+
+        color_col = "price_range_en" if "price_range_en" in df_plot.columns else None
+
+        # --- base charts (always) ---
         fig_hist = px.histogram(
-            df_filtrado,
+            df_plot,
             x=var,
             nbins=40,
             marginal="box",
             title=f"Distribution of {label}",
             labels={var: label},
         )
+
         fig_box = px.box(
-            df_filtrado,
+            df_plot,
             y=var,
             points="outliers",
             title=f"Boxplot of {label}",
@@ -367,47 +387,54 @@ def create_app() -> Flask:
         graph_hist_json = json.dumps(fig_hist, cls=plotly.utils.PlotlyJSONEncoder)
         graph_box_json = json.dumps(fig_box, cls=plotly.utils.PlotlyJSONEncoder)
 
-
         # --- extras (optional) ---
         graph_scatter_json = None
-        if "preco" in df_filtrado.columns and var in df_filtrado.columns and var != "preco":
+        if "preco" in df_plot.columns and var in df_plot.columns and var != "preco":
             fig_scatter = px.scatter(
-                df_filtrado,
+                df_plot,
                 x=var,
                 y="preco",
-                color="faixa_preco" if "faixa_preco" in df_filtrado.columns else None,
+                color=color_col,
                 title=f"Price vs {label}",
-                labels={var: label, "preco": "Price (€)"},
+                labels={
+                    var: label,
+                    "preco": "Price (€)",
+                    "price_range_en": "Price range",
+                },
             )
             graph_scatter_json = json.dumps(fig_scatter, cls=plotly.utils.PlotlyJSONEncoder)
 
         graph_box_faixa_json = None
-        if "faixa_preco" in df_filtrado.columns:
+        if "price_range_en" in df_plot.columns:
             fig_box_faixa = px.box(
-                df_filtrado,
-                x="faixa_preco",
+                df_plot,
+                x="price_range_en",
                 y=var,
                 title=f"{label} by price range",
-                labels={"faixa_preco": "Price range", var: label},
+                labels={"price_range_en": "Price range", var: label},
             )
             graph_box_faixa_json = json.dumps(fig_box_faixa, cls=plotly.utils.PlotlyJSONEncoder)
 
         graph_preco_ano_json = None
-        if "preco" in df_filtrado.columns and "ano_construcao" in df_filtrado.columns:
+        if "preco" in df_plot.columns and "ano_construcao" in df_plot.columns:
             fig_preco_ano = px.scatter(
-                df_filtrado,
+                df_plot,
                 x="ano_construcao",
                 y="preco",
-                color="faixa_preco" if "faixa_preco" in df_filtrado.columns else None,
+                color=color_col,
                 title="Price vs Year Built",
-                labels={"ano_construcao": "Year Built", "preco": "Price (€)"},
+                labels={
+                    "ano_construcao": "Year Built",
+                    "preco": "Price (€)",
+                    "price_range_en": "Price range",
+                },
             )
             graph_preco_ano_json = json.dumps(fig_preco_ano, cls=plotly.utils.PlotlyJSONEncoder)
 
         graph_heatmap_json = None
-        corr_cols = [c for c in ["preco", "preco_m2", "area_habitavel", "area_total", "quartos", "banheiros"] if c in df_filtrado.columns]
+        corr_cols = [c for c in ["preco", "preco_m2", "area_habitavel", "area_total", "quartos", "banheiros"] if c in df_plot.columns]
         if len(corr_cols) >= 2:
-            corr = df_filtrado[corr_cols].corr(numeric_only=True)
+            corr = df_plot[corr_cols].corr(numeric_only=True)
             fig_heat = px.imshow(
                 corr,
                 text_auto=True,
@@ -417,8 +444,8 @@ def create_app() -> Flask:
             graph_heatmap_json = json.dumps(fig_heat, cls=plotly.utils.PlotlyJSONEncoder)
 
         graph_map_json = None
-        if "latitude" in df_filtrado.columns and "longitude" in df_filtrado.columns:
-            df_map = df_filtrado.dropna(subset=["latitude", "longitude"]).copy()
+        if "latitude" in df_plot.columns and "longitude" in df_plot.columns:
+            df_map = df_plot.dropna(subset=["latitude", "longitude"]).copy()
 
             # Performance: limit points
             MAX_PONTOS = 2000
@@ -430,10 +457,11 @@ def create_app() -> Flask:
                     df_map,
                     lat="latitude",
                     lon="longitude",
-                    color="faixa_preco" if "faixa_preco" in df_map.columns else None,
+                    color=color_col,
                     zoom=9,
                     height=550,
                     title=f"Properties map (sample up to {MAX_PONTOS} properties)",
+                    labels={"price_range_en": "Price range"},
                 )
 
                 # OpenStreetMap (no token required)
@@ -450,11 +478,11 @@ def create_app() -> Flask:
         # neighborhood (optional)
         graph_box_bairro_json = None
         graph_bar_bairro_json = None
-        bairro_col = "bairro" if "bairro" in df_filtrado.columns else ("Neighborhood" if "Neighborhood" in df_filtrado.columns else None)
+        bairro_col = "bairro" if "bairro" in df_plot.columns else ("Neighborhood" if "Neighborhood" in df_plot.columns else None)
 
-        if bairro_col and "preco" in df_filtrado.columns:
+        if bairro_col and "preco" in df_plot.columns:
             top = (
-                df_filtrado[[bairro_col, "preco"]]
+                df_plot[[bairro_col, "preco"]]
                 .dropna()
                 .groupby(bairro_col)["preco"]
                 .mean()
@@ -463,7 +491,7 @@ def create_app() -> Flask:
                 .index
                 .tolist()
             )
-            df_bairro = df_filtrado[df_filtrado[bairro_col].isin(top)].copy()
+            df_bairro = df_plot[df_plot[bairro_col].isin(top)].copy()
 
             if len(df_bairro) > 0:
                 fig_box_bairro = px.box(
@@ -522,6 +550,7 @@ def create_app() -> Flask:
             graph_box_bairro_json=graph_box_bairro_json,
             graph_bar_bairro_json=graph_bar_bairro_json,
         )
+
 
     return app
 app = create_app()
