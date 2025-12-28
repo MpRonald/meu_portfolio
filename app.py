@@ -39,33 +39,32 @@ COLUNAS_PROJETO = [
 ]
 
 NOMES_AMIGAVEIS = {
-    "preco": "Property Price (€)",
-    "quartos": "Bedrooms",
-    "banheiros": "Bathrooms",
-    "area_habitavel": "Living Area (m²)",
-    "area_lote": "Lot Area (m²)",
-    "andares": "Number of Floors",
-    "area_acima_solo": "Above-Ground Area (m²)",
-    "area_porao": "Basement Area (m²)",
-    "ano_construcao": "Year Built",
+    "preco": "Preço do Imóvel (€)",
+    "quartos": "Número de Quartos",
+    "banheiros": "Número de WC",
+    "area_habitavel": "Área Habitável (m²)",
+    "area_lote": "Área do Lote (m²)",
+    "andares": "Número de Andares",
+    "area_acima_solo": "Área acima do Solo (m²)",
+    "area_porao": "Área da Cave/PORÃO (m²)",
+    "ano_construcao": "Ano de Construção",
     "latitude": "Latitude",
     "longitude": "Longitude",
-    "area_habitavel_viz": "Neighborhood Avg Living Area (m²)",
-    "area_lote_viz": "Neighborhood Avg Lot Area (m²)",
-    "faixa_preco": "Price Range",
-    "idade_imovel": "Property Age (years)",
-    "area_total": "Total Area (m²)",
-    "densidade_construcao": "Build Density",
-    "preco_m2": "Price per m² (€)",
+    "area_habitavel_viz": "Área Habitável Média dos Vizinhos (m²)",
+    "area_lote_viz": "Área do Lote Média dos Vizinhos (m²)",
+    "faixa_preco": "Faixa de Preço",
+    "idade_imovel": "Idade do Imóvel (anos)",
+    "area_total": "Área Total (m²)",
+    "densidade_construcao": "Densidade de Construção",
+    "preco_m2": "Preço por m² (€)",
 }
 
 NOMES_FAIXA = {
-    "baixo": "Low Price",
-    "medio": "Medium Price",
-    "alto": "High Price",
-    "muito_alto": "Very High Price",
+    "baixo": "Preço Baixo",
+    "medio": "Preço Médio",
+    "alto": "Preço Alto",
+    "muito_alto": "Preço Muito Alto",
 }
-
 
 
 def _configure_logging(app: Flask) -> None:
@@ -296,231 +295,232 @@ def create_app() -> Flask:
         return resp
 
     # =========================
-# AMES
-# =========================
-@app.route("/ames", methods=["GET", "POST"])
-def ames_dashboard():
-    df_completo = service.load_ames_data()
-    df = df_completo.copy()
+    # AMES
+    # =========================
+    @app.route("/ames", methods=["GET", "POST"])
+    def ames_dashboard():
+        df_completo = service.load_ames_data()
+        df = df_completo.copy()
 
-    # preferred numeric variables
-    numeric_cols = [c for c in COLUNAS_PROJETO if c in df.columns and c != "faixa_preco"]
+        # preferred numeric variables
+        numeric_cols = [c for c in COLUNAS_PROJETO if c in df.columns and c != "faixa_preco"]
 
-    # fallback: any numeric columns in the CSV
-    if not numeric_cols:
-        numeric_cols = df.select_dtypes(include="number").columns.tolist()
+        # fallback: any numeric columns in the CSV
+        if not numeric_cols:
+            numeric_cols = df.select_dtypes(include="number").columns.tolist()
 
-    if not numeric_cols:
-        return jsonify({"error": "No numeric columns available in the Ames dataset."}), 500
+        if not numeric_cols:
+            return jsonify({"error": "No numeric columns available in the Ames dataset."}), 500
 
-    # ensure friendly names exist for all listed variables
-    nomes_amig = dict(NOMES_AMIGAVEIS)
-    for c in numeric_cols:
-        nomes_amig.setdefault(c, c)
 
-    default_var = "preco" if "preco" in numeric_cols else numeric_cols[0]
-    var = request.form.get("variavel", default_var)
+        # ensure friendly names exist for all listed variables
+        nomes_amig = dict(NOMES_AMIGAVEIS)
+        for c in numeric_cols:
+            nomes_amig.setdefault(c, c)
 
-    faixas_unicas = ["Todos"]
-    if "faixa_preco" in df.columns:
-        faixas_unicas += sorted(df["faixa_preco"].dropna().unique().tolist())
+        default_var = "preco" if "preco" in numeric_cols else numeric_cols[0]
+        var = request.form.get("variavel", default_var)
 
-    faixa_selecionada = request.form.get("faixa_preco", "Todos")
+        faixas_unicas = ["Todos"]
+        if "faixa_preco" in df.columns:
+            faixas_unicas += sorted(df["faixa_preco"].dropna().unique().tolist())
 
-    df_filtrado = df.copy()
-    if faixa_selecionada != "Todos" and "faixa_preco" in df_filtrado.columns:
-        df_filtrado = df_filtrado[df_filtrado["faixa_preco"] == faixa_selecionada]
+        faixa_selecionada = request.form.get("faixa_preco", "Todos")
 
-    if var not in df_filtrado.columns:
-        var = default_var
+        df_filtrado = df.copy()
+        if faixa_selecionada != "Todos" and "faixa_preco" in df_filtrado.columns:
+            df_filtrado = df_filtrado[df_filtrado["faixa_preco"] == faixa_selecionada]
 
-    serie = pd.to_numeric(df_filtrado[var], errors="coerce").dropna()
-    stats_dict = service.calcular_estatisticas_1d(serie)
+        if var not in df_filtrado.columns:
+            var = default_var
 
-    testes_extra = service.calcular_testes_adicionais(
-        serie=serie,
-        df_filtrado=df_filtrado,
-        var=var,
-        df_completo=df_completo if faixa_selecionada == "Todos" else None,
-    )
+        serie = pd.to_numeric(df_filtrado[var], errors="coerce").dropna()
+        stats_dict = service.calcular_estatisticas_1d(serie)
 
-    label = nomes_amig.get(var, var)
+        testes_extra = service.calcular_testes_adicionais(
+            serie=serie,
+            df_filtrado=df_filtrado,
+            var=var,
+            df_completo=df_completo if faixa_selecionada == "Todos" else None,
+        )
+
+        label = nomes_amig.get(var, var)
 
     # --- base charts (always) ---
-    fig_hist = px.histogram(
-        df_filtrado,
-        x=var,
-        nbins=40,
-        marginal="box",
-        title=f"Distribution of {label}",
-        labels={var: label},
-    )
-    fig_box = px.box(
-        df_filtrado,
-        y=var,
-        points="outliers",
-        title=f"Boxplot of {label}",
-        labels={var: label},
-    )
-
-    graph_hist_json = json.dumps(fig_hist, cls=plotly.utils.PlotlyJSONEncoder)
-    graph_box_json = json.dumps(fig_box, cls=plotly.utils.PlotlyJSONEncoder)
-
-    # --- extras (optional) ---
-    graph_scatter_json = None
-    if "preco" in df_filtrado.columns and var in df_filtrado.columns and var != "preco":
-        fig_scatter = px.scatter(
+        fig_hist = px.histogram(
             df_filtrado,
             x=var,
-            y="preco",
-            color="faixa_preco" if "faixa_preco" in df_filtrado.columns else None,
-            title=f"Price vs {label}",
-            labels={var: label, "preco": "Price (€)"},
+            nbins=40,
+            marginal="box",
+            title=f"Distribution of {label}",
+            labels={var: label},
         )
-        graph_scatter_json = json.dumps(fig_scatter, cls=plotly.utils.PlotlyJSONEncoder)
-
-    graph_box_faixa_json = None
-    if "faixa_preco" in df_filtrado.columns:
-        fig_box_faixa = px.box(
+        fig_box = px.box(
             df_filtrado,
-            x="faixa_preco",
             y=var,
-            title=f"{label} by price range",
-            labels={"faixa_preco": "Price range", var: label},
+            points="outliers",
+            title=f"Boxplot of {label}",
+            labels={var: label},
         )
-        graph_box_faixa_json = json.dumps(fig_box_faixa, cls=plotly.utils.PlotlyJSONEncoder)
 
-    graph_preco_ano_json = None
-    if "preco" in df_filtrado.columns and "ano_construcao" in df_filtrado.columns:
-        fig_preco_ano = px.scatter(
-            df_filtrado,
-            x="ano_construcao",
-            y="preco",
-            color="faixa_preco" if "faixa_preco" in df_filtrado.columns else None,
-            title="Price vs Year Built",
-            labels={"ano_construcao": "Year Built", "preco": "Price (€)"},
-        )
-        graph_preco_ano_json = json.dumps(fig_preco_ano, cls=plotly.utils.PlotlyJSONEncoder)
+        graph_hist_json = json.dumps(fig_hist, cls=plotly.utils.PlotlyJSONEncoder)
+        graph_box_json = json.dumps(fig_box, cls=plotly.utils.PlotlyJSONEncoder)
 
-    graph_heatmap_json = None
-    corr_cols = [c for c in ["preco", "preco_m2", "area_habitavel", "area_total", "quartos", "banheiros"] if c in df_filtrado.columns]
-    if len(corr_cols) >= 2:
-        corr = df_filtrado[corr_cols].corr(numeric_only=True)
-        fig_heat = px.imshow(
-            corr,
-            text_auto=True,
-            aspect="auto",
-            title="Correlation matrix (Pearson)",
-        )
-        graph_heatmap_json = json.dumps(fig_heat, cls=plotly.utils.PlotlyJSONEncoder)
 
-    graph_map_json = None
-    if "latitude" in df_filtrado.columns and "longitude" in df_filtrado.columns:
-        df_map = df_filtrado.dropna(subset=["latitude", "longitude"]).copy()
-
-        # Performance: limit points
-        MAX_PONTOS = 2000
-        if len(df_map) > MAX_PONTOS:
-            df_map = df_map.sample(MAX_PONTOS, random_state=42)
-
-        if len(df_map) > 0:
-            fig_map = px.scatter_mapbox(
-                df_map,
-                lat="latitude",
-                lon="longitude",
-                color="faixa_preco" if "faixa_preco" in df_map.columns else None,
-                zoom=9,
-                height=550,
-                title=f"Properties map (sample up to {MAX_PONTOS} properties)",
-            )
-
-            # OpenStreetMap (no token required)
-            fig_map.update_layout(
-                mapbox_style="open-street-map",
-                margin=dict(l=0, r=0, t=40, b=0)
-            )
-
-            # small and lightweight points
-            fig_map.update_traces(marker=dict(size=6, opacity=0.6))
-
-            graph_map_json = json.dumps(fig_map, cls=plotly.utils.PlotlyJSONEncoder)
-
-    # neighborhood (optional)
-    graph_box_bairro_json = None
-    graph_bar_bairro_json = None
-    bairro_col = "bairro" if "bairro" in df_filtrado.columns else ("Neighborhood" if "Neighborhood" in df_filtrado.columns else None)
-
-    if bairro_col and "preco" in df_filtrado.columns:
-        top = (
-            df_filtrado[[bairro_col, "preco"]]
-            .dropna()
-            .groupby(bairro_col)["preco"]
-            .mean()
-            .sort_values(ascending=False)
-            .head(20)
-            .index
-            .tolist()
-        )
-        df_bairro = df_filtrado[df_filtrado[bairro_col].isin(top)].copy()
-
-        if len(df_bairro) > 0:
-            fig_box_bairro = px.box(
-                df_bairro,
-                x=bairro_col,
+        # --- extras (optional) ---
+        graph_scatter_json = None
+        if "preco" in df_filtrado.columns and var in df_filtrado.columns and var != "preco":
+            fig_scatter = px.scatter(
+                df_filtrado,
+                x=var,
                 y="preco",
-                title="Price distribution by neighborhood (Top 20)",
-                labels={bairro_col: "Neighborhood", "preco": "Price (€)"},
+                color="faixa_preco" if "faixa_preco" in df_filtrado.columns else None,
+                title=f"Price vs {label}",
+                labels={var: label, "preco": "Price (€)"},
             )
-            fig_box_bairro.update_layout(xaxis_tickangle=-45)
-            graph_box_bairro_json = json.dumps(fig_box_bairro, cls=plotly.utils.PlotlyJSONEncoder)
+            graph_scatter_json = json.dumps(fig_scatter, cls=plotly.utils.PlotlyJSONEncoder)
 
-            fig_bar_bairro = px.bar(
-                df_bairro.groupby(bairro_col, as_index=False)["preco"].mean().sort_values("preco", ascending=False),
-                x=bairro_col,
+        graph_box_faixa_json = None
+        if "faixa_preco" in df_filtrado.columns:
+            fig_box_faixa = px.box(
+                df_filtrado,
+                x="faixa_preco",
+                y=var,
+                title=f"{label} by price range",
+                labels={"faixa_preco": "Price range", var: label},
+            )
+            graph_box_faixa_json = json.dumps(fig_box_faixa, cls=plotly.utils.PlotlyJSONEncoder)
+
+        graph_preco_ano_json = None
+        if "preco" in df_filtrado.columns and "ano_construcao" in df_filtrado.columns:
+            fig_preco_ano = px.scatter(
+                df_filtrado,
+                x="ano_construcao",
                 y="preco",
-                title="Average price by neighborhood (Top 20)",
-                labels={bairro_col: "Neighborhood", "preco": "Average price (€)"},
+                color="faixa_preco" if "faixa_preco" in df_filtrado.columns else None,
+                title="Price vs Year Built",
+                labels={"ano_construcao": "Year Built", "preco": "Price (€)"},
             )
-            fig_bar_bairro.update_layout(xaxis_tickangle=-45)
-            graph_bar_bairro_json = json.dumps(fig_bar_bairro, cls=plotly.utils.PlotlyJSONEncoder)
+            graph_preco_ano_json = json.dumps(fig_preco_ano, cls=plotly.utils.PlotlyJSONEncoder)
 
-    interpretacao_normalidade = None
-    if stats_dict.get("p_valor_shapiro") is not None:
-        alpha = 0.05
-        if stats_dict["p_valor_shapiro"] < alpha:
-            interpretacao_normalidade = (
-                "p < 0.05 ⇒ reject the null hypothesis of normality "
-                "(the distribution is not approximately normal)."
+        graph_heatmap_json = None
+        corr_cols = [c for c in ["preco", "preco_m2", "area_habitavel", "area_total", "quartos", "banheiros"] if c in df_filtrado.columns]
+        if len(corr_cols) >= 2:
+            corr = df_filtrado[corr_cols].corr(numeric_only=True)
+            fig_heat = px.imshow(
+                corr,
+                text_auto=True,
+                aspect="auto",
+                title="Correlation matrix (Pearson)",
             )
-        else:
-            interpretacao_normalidade = (
-                "p ≥ 0.05 ⇒ fail to reject the null hypothesis of normality "
-                "(the distribution can be considered approximately normal)."
+            graph_heatmap_json = json.dumps(fig_heat, cls=plotly.utils.PlotlyJSONEncoder)
+
+        graph_map_json = None
+        if "latitude" in df_filtrado.columns and "longitude" in df_filtrado.columns:
+            df_map = df_filtrado.dropna(subset=["latitude", "longitude"]).copy()
+
+            # Performance: limit points
+            MAX_PONTOS = 2000
+            if len(df_map) > MAX_PONTOS:
+                df_map = df_map.sample(MAX_PONTOS, random_state=42)
+
+            if len(df_map) > 0:
+                fig_map = px.scatter_mapbox(
+                    df_map,
+                    lat="latitude",
+                    lon="longitude",
+                    color="faixa_preco" if "faixa_preco" in df_map.columns else None,
+                    zoom=9,
+                    height=550,
+                    title=f"Properties map (sample up to {MAX_PONTOS} properties)",
+                )
+
+                # OpenStreetMap (no token required)
+                fig_map.update_layout(
+                    mapbox_style="open-street-map",
+                    margin=dict(l=0, r=0, t=40, b=0)
+                )
+
+                # small and lightweight points
+                fig_map.update_traces(marker=dict(size=6, opacity=0.6))
+
+                graph_map_json = json.dumps(fig_map, cls=plotly.utils.PlotlyJSONEncoder)
+
+        # neighborhood (optional)
+        graph_box_bairro_json = None
+        graph_bar_bairro_json = None
+        bairro_col = "bairro" if "bairro" in df_filtrado.columns else ("Neighborhood" if "Neighborhood" in df_filtrado.columns else None)
+
+        if bairro_col and "preco" in df_filtrado.columns:
+            top = (
+                df_filtrado[[bairro_col, "preco"]]
+                .dropna()
+                .groupby(bairro_col)["preco"]
+                .mean()
+                .sort_values(ascending=False)
+                .head(20)
+                .index
+                .tolist()
             )
+            df_bairro = df_filtrado[df_filtrado[bairro_col].isin(top)].copy()
 
-    return safe_render(
-        "ames.html",
-        variavel_selecionada=var,
-        variaveis=numeric_cols,
-        faixa_selecionada=faixa_selecionada,
-        faixas=faixas_unicas,
-        estatisticas=stats_dict,
-        testes_extra=testes_extra,
-        interpretacao_normalidade=interpretacao_normalidade,
-        nomes_amigaveis=nomes_amig,
-        nomes_faixa=NOMES_FAIXA,
+            if len(df_bairro) > 0:
+                fig_box_bairro = px.box(
+                    df_bairro,
+                    x=bairro_col,
+                    y="preco",
+                    title="Price distribution by neighborhood (Top 20)",
+                    labels={bairro_col: "Neighborhood", "preco": "Price (€)"},
+                )
+                fig_box_bairro.update_layout(xaxis_tickangle=-45)
+                graph_box_bairro_json = json.dumps(fig_box_bairro, cls=plotly.utils.PlotlyJSONEncoder)
 
-        graph_hist_json=graph_hist_json,
-        graph_box_json=graph_box_json,
-        graph_scatter_json=graph_scatter_json,
-        graph_box_faixa_json=graph_box_faixa_json,
-        graph_preco_ano_json=graph_preco_ano_json,
-        graph_heatmap_json=graph_heatmap_json,
-        graph_map_json=graph_map_json,
-        graph_box_bairro_json=graph_box_bairro_json,
-        graph_bar_bairro_json=graph_bar_bairro_json,
-    )
+                fig_bar_bairro = px.bar(
+                    df_bairro.groupby(bairro_col, as_index=False)["preco"].mean().sort_values("preco", ascending=False),
+                    x=bairro_col,
+                    y="preco",
+                    title="Average price by neighborhood (Top 20)",
+                    labels={bairro_col: "Neighborhood", "preco": "Average price (€)"},
+                )
+                fig_bar_bairro.update_layout(xaxis_tickangle=-45)
+                graph_bar_bairro_json = json.dumps(fig_bar_bairro, cls=plotly.utils.PlotlyJSONEncoder)
 
+        interpretacao_normalidade = None
+        if stats_dict.get("p_valor_shapiro") is not None:
+            alpha = 0.05
+            if stats_dict["p_valor_shapiro"] < alpha:
+                interpretacao_normalidade = (
+                    "p < 0.05 ⇒ reject the null hypothesis of normality "
+                    "(the distribution is not approximately normal)."
+                )
+            else:
+                interpretacao_normalidade = (
+                    "p ≥ 0.05 ⇒ fail to reject the null hypothesis of normality "
+                    "(the distribution can be considered approximately normal)."
+                )
+
+        return safe_render(
+            "ames.html",
+            variavel_selecionada=var,
+            variaveis=numeric_cols,
+            faixa_selecionada=faixa_selecionada,
+            faixas=faixas_unicas,
+            estatisticas=stats_dict,
+            testes_extra=testes_extra,
+            interpretacao_normalidade=interpretacao_normalidade,
+            nomes_amigaveis=nomes_amig,
+            nomes_faixa=NOMES_FAIXA,
+
+            graph_hist_json=graph_hist_json,
+            graph_box_json=graph_box_json,
+            graph_scatter_json=graph_scatter_json,
+            graph_box_faixa_json=graph_box_faixa_json,
+            graph_preco_ano_json=graph_preco_ano_json,
+            graph_heatmap_json=graph_heatmap_json,
+            graph_map_json=graph_map_json,
+            graph_box_bairro_json=graph_box_bairro_json,
+            graph_bar_bairro_json=graph_bar_bairro_json,
+        )
 
 
 app = create_app()
