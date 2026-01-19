@@ -10,6 +10,6 @@ joblib==1.4.2
 scipy==1.14.0
 statsmodels==0.14.2
 plotly==5.23.0
-# prophet==1.1.5
+prophet==1.1.5
 setuptools>=70.0.0
 wheel>=0.43.0
