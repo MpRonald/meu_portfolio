@@ -1,11 +1,21 @@
 import requests
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
 import numpy as np
 import pandas as pd
 from scipy import stats
+
+# FX / ML
+import yfinance as yf
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from statsmodels.tsa.arima.model import ARIMA
+
+# Prophet (vais descomentar no requirements.txt)
+from prophet import Prophet
 
 
 class PortfolioService:
@@ -13,16 +23,16 @@ class PortfolioService:
         self.timeout = timeout
         self.data_dir = Path(data_dir) if data_dir else None
 
-    # =========================
-    # Weather (Open-Meteo)
-    # =========================
+    # =========================================================
+    # WEATHER (Open-Meteo)
+    # =========================================================
     def geocode_city(self, name: str, count: int = 1, lang: str = "pt") -> dict:
         url = "https://geocoding-api.open-meteo.com/v1/search"
         params = {"name": name, "count": count, "language": lang, "format": "json"}
         r = requests.get(url, params=params, timeout=self.timeout)
         r.raise_for_status()
         js = r.json()
-        res = (js.get("results") or [])
+        res = js.get("results") or []
         if not res:
             return {}
         top = res[0]
@@ -65,28 +75,25 @@ class PortfolioService:
         r.raise_for_status()
         return r.json()
 
-    # =========================
-    # Ames (dataset + stats)
-    # =========================
+    # =========================================================
+    # AMES
+    # =========================================================
     @lru_cache(maxsize=1)
     def load_ames_data(self) -> pd.DataFrame:
         if not self.data_dir:
-            raise RuntimeError("data_dir não configurado no PortfolioService.")
+            raise RuntimeError("data_dir não configurado.")
 
         csv_path = self.data_dir / "ames.csv"
         if not csv_path.exists():
-            raise FileNotFoundError(f"Ficheiro {csv_path} não encontrado.")
+            raise FileNotFoundError(f"{csv_path} não encontrado.")
 
         df = pd.read_csv(csv_path)
 
-        # tenta garantir tipos numéricos em colunas que façam sentido
         for c in df.columns:
             if c in {"faixa_preco", "bairro", "Neighborhood"}:
                 continue
             if df[c].dtype == object:
-                # converter o que der; se não der, mantém
                 converted = pd.to_numeric(df[c], errors="coerce")
-                # se converteu alguma coisa, usa; senão mantém original
                 if converted.notna().sum() > 0:
                     df[c] = converted
 
@@ -96,42 +103,13 @@ class PortfolioService:
         s = serie.dropna()
 
         if len(s) == 0:
-            return {
-                "n": 0,
-                "media": None,
-                "mediana": None,
-                "moda": None,
-                "minimo": None,
-                "maximo": None,
-                "variancia": None,
-                "desvio_padrao": None,
-                "q1": None,
-                "q3": None,
-                "iqr": None,
-                "assimetria": None,
-                "curtose": None,
-                "stat_shapiro": None,
-                "p_valor_shapiro": None,
-            }
+            return {k: None for k in [
+                "n", "media", "mediana", "moda", "minimo", "maximo",
+                "variancia", "desvio_padrao", "q1", "q3", "iqr",
+                "assimetria", "curtose", "stat_shapiro", "p_valor_shapiro"
+            ]}
 
-        media = float(s.mean())
-        mediana = float(s.median())
-        moda_vals = s.mode()
-        moda = float(moda_vals.iloc[0]) if not moda_vals.empty else None
-        minimo = float(s.min())
-        maximo = float(s.max())
-        variancia = float(s.var())
-        desvio_padrao = float(s.std())
-        q1 = float(s.quantile(0.25))
-        q3 = float(s.quantile(0.75))
-        iqr = q3 - q1
-
-        assimetria = float(s.skew())
-        curtose = float(s.kurtosis())
-
-        sample = s
-        if len(s) > 5000:
-            sample = s.sample(5000, random_state=42)
+        sample = s if len(s) <= 5000 else s.sample(5000, random_state=42)
 
         try:
             stat_sh, p_valor = stats.shapiro(sample)
@@ -140,127 +118,135 @@ class PortfolioService:
 
         return {
             "n": int(len(s)),
-            "media": media,
-            "mediana": mediana,
-            "moda": moda,
-            "minimo": minimo,
-            "maximo": maximo,
-            "variancia": variancia,
-            "desvio_padrao": desvio_padrao,
-            "q1": q1,
-            "q3": q3,
-            "iqr": iqr,
-            "assimetria": assimetria,
-            "curtose": curtose,
+            "media": float(s.mean()),
+            "mediana": float(s.median()),
+            "moda": float(s.mode().iloc[0]) if not s.mode().empty else None,
+            "minimo": float(s.min()),
+            "maximo": float(s.max()),
+            "variancia": float(s.var()),
+            "desvio_padrao": float(s.std()),
+            "q1": float(s.quantile(0.25)),
+            "q3": float(s.quantile(0.75)),
+            "iqr": float(s.quantile(0.75) - s.quantile(0.25)),
+            "assimetria": float(s.skew()),
+            "curtose": float(s.kurtosis()),
             "stat_shapiro": float(stat_sh) if not np.isnan(stat_sh) else None,
             "p_valor_shapiro": float(p_valor) if not np.isnan(p_valor) else None,
         }
 
-    def calcular_testes_adicionais(
-        self,
-        serie: pd.Series,
-        df_filtrado: pd.DataFrame,
-        var: str,
-        df_completo: Optional[pd.DataFrame],
-    ) -> Dict[str, Optional[float]]:
-        resultados: Dict[str, Optional[float]] = {}
-        s = serie.dropna()
+    # =========================================================
+    # FX / MARKETS
+    # =========================================================
+    FX_PAIRS = {
+        "USD/BRL": "BRL=X",
+        "EUR/USD": "EURUSD=X",
+        "USD/JPY": "JPY=X",
+        "GBP/USD": "GBPUSD=X",
+    }
 
-        # Jarque–Bera
-        try:
-            jb_stat, jb_p = stats.jarque_bera(s)
-            resultados["jb_stat"] = float(jb_stat)
-            resultados["jb_p"] = float(jb_p)
-        except Exception:
-            resultados["jb_stat"] = None
-            resultados["jb_p"] = None
+    FX_WINDOW_SIZE = 30
+    FX_RANDOM_STATE = 42
 
-        # Pearson com preco e preco_m2
-        for alvo in ["preco", "preco_m2"]:
-            r_key = f"corr_{alvo}_r"
-            p_key = f"corr_{alvo}_p"
-            if alvo in df_filtrado.columns and var in df_filtrado.columns and var != alvo:
-                subset = df_filtrado[[var, alvo]].dropna()
-                if len(subset) >= 3:
-                    try:
-                        r, p = stats.pearsonr(subset[var], subset[alvo])
-                        resultados[r_key] = float(r)
-                        resultados[p_key] = float(p)
-                    except Exception:
-                        resultados[r_key] = None
-                        resultados[p_key] = None
-                else:
-                    resultados[r_key] = None
-                    resultados[p_key] = None
-            else:
-                resultados[r_key] = None
-                resultados[p_key] = None
+    def fx_download_history(self, ticker: str, period: str = "3y") -> pd.Series:
+        data = yf.download(ticker, period=period, interval="1d", auto_adjust=True)
+        if data is None or data.empty:
+            raise ValueError("Sem dados históricos.")
+        s = data["Close"].dropna().copy()
+        s.index = pd.to_datetime(s.index).tz_localize(None)
+        s.name = "rate"
+        return s
 
-        # Spearman com preco
-        if "preco" in df_filtrado.columns and var in df_filtrado.columns and var != "preco":
-            subset = df_filtrado[[var, "preco"]].dropna()
-            if len(subset) >= 3:
-                try:
-                    rho, p_s = stats.spearmanr(subset[var], subset["preco"])
-                    resultados["corr_spearman_r"] = float(rho)
-                    resultados["corr_spearman_p"] = float(p_s)
-                except Exception:
-                    resultados["corr_spearman_r"] = None
-                    resultados["corr_spearman_p"] = None
-            else:
-                resultados["corr_spearman_r"] = None
-                resultados["corr_spearman_p"] = None
-        else:
-            resultados["corr_spearman_r"] = None
-            resultados["corr_spearman_p"] = None
+    def _fx_metrics(self, y_true, y_pred) -> Dict[str, float]:
+        mae = mean_absolute_error(y_true, y_pred)
+        mse = mean_squared_error(y_true, y_pred)
+        rmse = float(np.sqrt(mse))
+        denom = np.clip(np.abs(y_true), 1e-8, None)
+        mape = float(np.mean(np.abs((y_true - y_pred) / denom)) * 100)
+        return {"mae": mae, "rmse": rmse, "mape": mape}
 
-        # Kruskal–Wallis por faixa_preco (só quando sem filtro: df_completo não None)
-        if df_completo is not None and "faixa_preco" in df_completo.columns and var in df_completo.columns:
-            grupos = []
-            for faixa in sorted(df_completo["faixa_preco"].dropna().unique().tolist()):
-                vals = df_completo.loc[df_completo["faixa_preco"] == faixa, var].dropna()
-                if len(vals) >= 3:
-                    grupos.append(vals.values)
+    def fx_rf(self, series: pd.Series, n_days: int) -> Tuple[Dict, pd.DataFrame]:
+        values = series.values.astype(float)
+        X, y = [], []
+        for i in range(self.FX_WINDOW_SIZE, len(values)):
+            X.append(values[i - self.FX_WINDOW_SIZE:i])
+            y.append(values[i])
+        X, y = np.array(X), np.array(y)
 
-            if len(grupos) >= 2:
-                try:
-                    H, p_kw = stats.kruskal(*grupos)
-                    resultados["kruskal_H"] = float(H)
-                    resultados["kruskal_p"] = float(p_kw)
-                except Exception:
-                    resultados["kruskal_H"] = None
-                    resultados["kruskal_p"] = None
-            else:
-                resultados["kruskal_H"] = None
-                resultados["kruskal_p"] = None
-        else:
-            resultados["kruskal_H"] = None
-            resultados["kruskal_p"] = None
+        split = int(len(X) * 0.8)
+        X_train, X_test = X[:split], X[split:]
+        y_train, y_test = y[:split], y[split:]
 
-        # Regressão linear simples: preco ~ var
-        if "preco" in df_filtrado.columns and var in df_filtrado.columns and var != "preco":
-            subset = df_filtrado[[var, "preco"]].dropna()
-            if len(subset) >= 3:
-                try:
-                    res = stats.linregress(subset[var], subset["preco"])
-                    resultados["reg_beta0"] = float(res.intercept)
-                    resultados["reg_beta1"] = float(res.slope)
-                    resultados["reg_r2"] = float(res.rvalue ** 2)
-                    resultados["reg_p_beta1"] = float(res.pvalue)
-                except Exception:
-                    resultados["reg_beta0"] = None
-                    resultados["reg_beta1"] = None
-                    resultados["reg_r2"] = None
-                    resultados["reg_p_beta1"] = None
-            else:
-                resultados["reg_beta0"] = None
-                resultados["reg_beta1"] = None
-                resultados["reg_r2"] = None
-                resultados["reg_p_beta1"] = None
-        else:
-            resultados["reg_beta0"] = None
-            resultados["reg_beta1"] = None
-            resultados["reg_r2"] = None
-            resultados["reg_p_beta1"] = None
+        scaler = StandardScaler()
+        X_train = scaler.fit_transform(X_train)
+        X_test = scaler.transform(X_test)
 
-        return resultados
+        model = RandomForestRegressor(
+            n_estimators=300,
+            random_state=self.FX_RANDOM_STATE,
+            n_jobs=-1
+        )
+        model.fit(X_train, y_train)
+        metrics = self._fx_metrics(y_test, model.predict(X_test))
+
+        history = values[-self.FX_WINDOW_SIZE:].tolist()
+        future, dates = [], []
+        last_date = series.index[-1]
+
+        for i in range(n_days):
+            X_in = scaler.transform([history])
+            pred = float(model.predict(X_in)[0])
+            future.append(pred)
+            dates.append(last_date + pd.Timedelta(days=i + 1))
+            history = history[1:] + [pred]
+
+        forecast = pd.DataFrame(
+            {"forecast_rate": future},
+            index=pd.DatetimeIndex(dates, name="date")
+        )
+        return metrics, forecast
+
+    def fx_arima(self, series: pd.Series, n_days: int) -> Tuple[Dict, pd.DataFrame]:
+        split = int(len(series) * 0.8)
+        train, test = series.iloc[:split], series.iloc[split:]
+
+        model = ARIMA(train, order=(1, 1, 1)).fit()
+        metrics = self._fx_metrics(test.values, model.forecast(len(test)).values)
+
+        full = ARIMA(series, order=(1, 1, 1)).fit()
+        future = full.forecast(n_days)
+
+        dates = [series.index[-1] + pd.Timedelta(days=i + 1) for i in range(n_days)]
+        forecast = pd.DataFrame(
+            {"forecast_rate": future.values},
+            index=pd.DatetimeIndex(dates, name="date")
+        )
+        return metrics, forecast
+
+    def fx_prophet(self, series: pd.Series, n_days: int) -> Tuple[Dict, pd.DataFrame]:
+        df = series.reset_index()
+        df.columns = ["ds", "y"]
+
+        split = int(len(df) * 0.8)
+        train, test = df.iloc[:split], df.iloc[split:]
+
+        m = Prophet()
+        m.fit(train)
+
+        future_test = m.make_future_dataframe(periods=len(test), freq="D")
+        forecast_test = m.predict(future_test).iloc[-len(test):]
+
+        metrics = self._fx_metrics(
+            test["y"].values,
+            forecast_test["yhat"].values
+        )
+
+        m_full = Prophet()
+        m_full.fit(df)
+        future_full = m_full.make_future_dataframe(periods=n_days, freq="D")
+        forecast = m_full.predict(future_full).iloc[-n_days:]
+
+        forecast_df = forecast[["ds", "yhat"]].set_index("ds")
+        forecast_df.columns = ["forecast_rate"]
+        forecast_df.index.name = "date"
+
+        return metrics, forecast_df
