@@ -74,7 +74,6 @@ PRICE_RANGE_EN = {
 }
 
 
-
 def _configure_logging(app: Flask) -> None:
     level_name = os.getenv("LOG_LEVEL", "INFO").upper().strip()
     level = getattr(logging, level_name, logging.INFO)
@@ -184,9 +183,40 @@ def create_app() -> Flask:
     def quotes():
         return safe_render("quotes.html", erro="(Em construção) A migrar para o novo app.")
 
-    @app.route("/fx")
+    # =========================
+    # FX (RF / ARIMA / Prophet)
+    # =========================
+    @app.route("/fx", methods=["GET", "POST"])
     def fx():
-        return safe_render("fx.html", erro="(Em construção) A migrar para o novo app.")
+        pairs = service.fx_pairs()
+
+        if request.method == "GET":
+            return safe_render("fx.html", pairs=pairs, resultado=None, erro=None)
+
+        # POST
+        try:
+            pair_name = (request.form.get("pair") or "").strip()
+            algoritmo = (request.form.get("algoritmo") or "rf").strip().lower()
+            n_days = int(request.form.get("n_days", 30))
+
+            if pair_name not in pairs:
+                raise ValueError("Par de moedas inválido.")
+            if n_days < 1 or n_days > 180:
+                raise ValueError("n_days deve estar entre 1 e 180.")
+            if algoritmo not in {"rf", "arima", "prophet"}:
+                raise ValueError("Algoritmo inválido.")
+
+            resultado = service.fx_run_forecast(
+                pair_name=pair_name,
+                ticker=pairs[pair_name],
+                algoritmo=algoritmo,
+                n_days=n_days,
+            )
+
+            return safe_render("fx.html", pairs=pairs, resultado=resultado, erro=None)
+
+        except Exception as e:
+            return safe_render("fx.html", pairs=pairs, resultado=None, erro=str(e))
 
     @app.route("/ml/heart")
     def ml_heart():
@@ -251,7 +281,6 @@ def create_app() -> Flask:
             if not dates:
                 raise RuntimeError("Sem dados de previsão para este local.")
 
-            # ⚠️ teu weather.html usa chart.prob, mas a API não devolve probabilidade -> não quebrar JS
             prob = [None] * len(dates)
 
             chart = {
@@ -305,24 +334,18 @@ def create_app() -> Flask:
     # =========================
     # AMES
     # =========================
-    # =========================
-
     @app.route("/ames", methods=["GET", "POST"])
     def ames_dashboard():
         df_completo = service.load_ames_data()
         df = df_completo.copy()
 
-        # preferred numeric variables
         numeric_cols = [c for c in COLUNAS_PROJETO if c in df.columns and c != "faixa_preco"]
-
-        # fallback: any numeric columns in the CSV
         if not numeric_cols:
             numeric_cols = df.select_dtypes(include="number").columns.tolist()
 
         if not numeric_cols:
             return jsonify({"error": "No numeric columns available in the Ames dataset."}), 500
 
-        # ensure friendly names exist for all listed variables
         nomes_amig = dict(NOMES_AMIGAVEIS)
         for c in numeric_cols:
             nomes_amig.setdefault(c, c)
@@ -330,14 +353,12 @@ def create_app() -> Flask:
         default_var = "preco" if "preco" in numeric_cols else numeric_cols[0]
         var = request.form.get("variavel", default_var)
 
-        # price ranges list (keeps your existing "Todos" flow intact)
         faixas_unicas = ["Todos"]
         if "faixa_preco" in df.columns:
             faixas_unicas += sorted(df["faixa_preco"].dropna().unique().tolist())
 
         faixa_selecionada = request.form.get("faixa_preco", "Todos")
 
-        # filter data by price range (keeps original values: baixo/medio/alto/muito_alto)
         df_filtrado = df.copy()
         if faixa_selecionada != "Todos" and "faixa_preco" in df_filtrado.columns:
             df_filtrado = df_filtrado[df_filtrado["faixa_preco"] == faixa_selecionada]
@@ -357,16 +378,12 @@ def create_app() -> Flask:
 
         label = nomes_amig.get(var, var)
 
-        # =========================================
-        # Create a plot-only dataframe for English legends
-        # =========================================
         df_plot = df_filtrado.copy()
         if "faixa_preco" in df_plot.columns:
             df_plot["price_range_en"] = df_plot["faixa_preco"].map(PRICE_RANGE_EN).fillna(df_plot["faixa_preco"])
 
         color_col = "price_range_en" if "price_range_en" in df_plot.columns else None
 
-        # --- base charts (always) ---
         fig_hist = px.histogram(
             df_plot,
             x=var,
@@ -387,7 +404,6 @@ def create_app() -> Flask:
         graph_hist_json = json.dumps(fig_hist, cls=plotly.utils.PlotlyJSONEncoder)
         graph_box_json = json.dumps(fig_box, cls=plotly.utils.PlotlyJSONEncoder)
 
-        # --- extras (optional) ---
         graph_scatter_json = None
         if "preco" in df_plot.columns and var in df_plot.columns and var != "preco":
             fig_scatter = px.scatter(
@@ -446,8 +462,6 @@ def create_app() -> Flask:
         graph_map_json = None
         if "latitude" in df_plot.columns and "longitude" in df_plot.columns:
             df_map = df_plot.dropna(subset=["latitude", "longitude"]).copy()
-
-            # Performance: limit points
             MAX_PONTOS = 2000
             if len(df_map) > MAX_PONTOS:
                 df_map = df_map.sample(MAX_PONTOS, random_state=42)
@@ -463,19 +477,13 @@ def create_app() -> Flask:
                     title=f"Properties map (sample up to {MAX_PONTOS} properties)",
                     labels={"price_range_en": "Price range"},
                 )
-
-                # OpenStreetMap (no token required)
                 fig_map.update_layout(
                     mapbox_style="open-street-map",
                     margin=dict(l=0, r=0, t=40, b=0)
                 )
-
-                # small and lightweight points
                 fig_map.update_traces(marker=dict(size=6, opacity=0.6))
-
                 graph_map_json = json.dumps(fig_map, cls=plotly.utils.PlotlyJSONEncoder)
 
-        # neighborhood (optional)
         graph_box_bairro_json = None
         graph_bar_bairro_json = None
         bairro_col = "bairro" if "bairro" in df_plot.columns else ("Neighborhood" if "Neighborhood" in df_plot.columns else None)
@@ -539,7 +547,6 @@ def create_app() -> Flask:
             interpretacao_normalidade=interpretacao_normalidade,
             nomes_amigaveis=nomes_amig,
             nomes_faixa=NOMES_FAIXA,
-
             graph_hist_json=graph_hist_json,
             graph_box_json=graph_box_json,
             graph_scatter_json=graph_scatter_json,
@@ -551,8 +558,9 @@ def create_app() -> Flask:
             graph_bar_bairro_json=graph_bar_bairro_json,
         )
 
-
     return app
+
+
 app = create_app()
 
 if __name__ == "__main__":
