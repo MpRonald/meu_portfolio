@@ -4,10 +4,12 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from io import StringIO
+from types import SimpleNamespace
 
 import pandas as pd
 import plotly
 import plotly.express as px
+from plotly.offline import plot as plotly_plot
 
 from flask import Flask, render_template, jsonify, request, make_response
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -188,7 +190,7 @@ def create_app() -> Flask:
     # =========================
     @app.route("/fx", methods=["GET", "POST"])
     def fx():
-        pairs = service.fx_pairs()
+        pairs = dict(getattr(service, "FX_PAIRS", {}))  # existe no teu services.py
 
         if request.method == "GET":
             return safe_render("fx.html", pairs=pairs, resultado=None, erro=None)
@@ -206,11 +208,51 @@ def create_app() -> Flask:
             if algoritmo not in {"rf", "arima", "prophet"}:
                 raise ValueError("Algoritmo inválido.")
 
-            resultado = service.fx_run_forecast(
+            ticker = pairs[pair_name]
+            series = service.fx_download_history(ticker=ticker, period="3y")
+
+            # Treinar + prever
+            if algoritmo == "rf":
+                metrics, forecast_df = service.fx_train_and_forecast_rf(series, n_days)
+                algoritmo_label = "Random Forest"
+            elif algoritmo == "arima":
+                metrics, forecast_df = service.fx_train_and_forecast_arima(series, n_days)
+                algoritmo_label = "ARIMA"
+            else:
+                # Prophet pode não estar instalado -> mensagem amigável
+                try:
+                    metrics, forecast_df = service.fx_train_and_forecast_prophet(series, n_days)
+                except ModuleNotFoundError:
+                    raise RuntimeError("Prophet não está disponível neste deploy. Usa RF ou ARIMA.")
+                algoritmo_label = "Prophet"
+
+            # Gráfico: histórico recente + previsão
+            hist = series.copy().dropna()
+            hist_recent = hist.tail(180)  # deixa leve
+
+            df_hist = pd.DataFrame({"date": hist_recent.index, "value": hist_recent.values, "type": "Histórico"})
+            df_fc = pd.DataFrame({"date": forecast_df.index, "value": forecast_df["forecast_rate"].values, "type": "Previsão"})
+            df_plot = pd.concat([df_hist, df_fc], ignore_index=True)
+
+            fig = px.line(
+                df_plot,
+                x="date",
+                y="value",
+                color="type",
+                title=f"{pair_name} — Histórico e Previsão ({algoritmo_label})"
+            )
+            fig.update_layout(margin=dict(l=10, r=10, t=50, b=10))
+            fx_plot_div = plotly_plot(fig, output_type="div", include_plotlyjs=False)
+
+            # Montar objeto compatível com o template (acesso por ponto)
+            resultado = SimpleNamespace(
                 pair_name=pair_name,
-                ticker=pairs[pair_name],
                 algoritmo=algoritmo,
+                algoritmo_label=algoritmo_label,
                 n_days=n_days,
+                metrics=SimpleNamespace(**metrics),
+                forecast=forecast_df,
+                fx_plot_div=fx_plot_div,
             )
 
             return safe_render("fx.html", pairs=pairs, resultado=resultado, erro=None)

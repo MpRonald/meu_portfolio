@@ -1,7 +1,7 @@
 import requests
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
 import numpy as np
 import pandas as pd
@@ -13,6 +13,10 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from statsmodels.tsa.arima.model import ARIMA
+
+# Plotly (para gerar o HTML do gráfico no service)
+import plotly.graph_objects as go
+import plotly.io as pio
 
 
 class PortfolioService:
@@ -91,9 +95,7 @@ class PortfolioService:
             if c in {"faixa_preco", "bairro", "Neighborhood"}:
                 continue
             if df[c].dtype == object:
-                # converter o que der; se não der, mantém
                 converted = pd.to_numeric(df[c], errors="coerce")
-                # se converteu alguma coisa, usa; senão mantém original
                 if converted.notna().sum() > 0:
                     df[c] = converted
 
@@ -286,6 +288,10 @@ class PortfolioService:
     FX_WINDOW_SIZE = 30
     FX_RANDOM_STATE = 42
 
+    # ✅ ISTO FALTAVA (para o app.py)
+    def fx_pairs(self) -> dict:
+        return dict(self.FX_PAIRS)
+
     def fx_download_history(self, ticker: str, period: str = "3y") -> pd.Series:
         data = yf.download(ticker, period=period, interval="1d", auto_adjust=True)
         if data is None or data.empty:
@@ -421,7 +427,15 @@ class PortfolioService:
         return metrics, forecast_df
 
     def fx_train_and_forecast_prophet(self, series: pd.Series, n_days: int):
-        from prophet import Prophet
+        # ✅ import lazy: só tenta importar quando escolheres prophet
+        try:
+            from prophet import Prophet
+        except Exception as e:
+            raise RuntimeError(
+                "Prophet não está disponível no ambiente. "
+                "Confirma se descomentaste 'prophet' no requirements.txt e se o deploy suportou a instalação."
+            ) from e
+
         if len(series) < 80:
             raise ValueError("Dados insuficientes para treinar Prophet (menos de 80 observações).")
 
@@ -453,3 +467,74 @@ class PortfolioService:
         forecast_df = forecast_future.set_index("ds").rename(columns={"yhat": "forecast_rate"})
         forecast_df.index.name = "date"
         return metrics, forecast_df
+
+    def _fx_algoritmo_label(self, algoritmo: str) -> str:
+        alg = (algoritmo or "").lower().strip()
+        if alg == "rf":
+            return "Random Forest"
+        if alg == "arima":
+            return "ARIMA"
+        if alg == "prophet":
+            return "Prophet"
+        return alg.upper() if alg else "—"
+
+    def _fx_make_plot_div(self, history: pd.Series, forecast_df: pd.DataFrame, pair_name: str) -> str:
+        hist_tail = history.tail(180)  # desempenho e visual
+
+        fig = go.Figure()
+
+        fig.add_trace(go.Scatter(
+            x=hist_tail.index,
+            y=hist_tail.values,
+            mode="lines",
+            name="Histórico"
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=forecast_df.index,
+            y=forecast_df["forecast_rate"].values,
+            mode="lines",
+            name="Previsão"
+        ))
+
+        fig.update_layout(
+            title=f"{pair_name} — histórico e previsão",
+            xaxis_title="Data",
+            yaxis_title="Taxa",
+            margin=dict(l=10, r=10, t=50, b=10),
+            height=520
+        )
+
+        # HTML pronto para embutir no template
+        return pio.to_html(fig, full_html=False, include_plotlyjs="cdn")
+
+    # ✅ ISTO FALTAVA (para o app.py)
+    def fx_run_forecast(self, pair_name: str, ticker: str, algoritmo: str, n_days: int) -> Dict[str, Any]:
+        alg = (algoritmo or "rf").lower().strip()
+        if n_days < 1 or n_days > 180:
+            raise ValueError("n_days deve estar entre 1 e 180.")
+
+        history = self.fx_download_history(ticker=ticker, period="3y")
+
+        if alg == "rf":
+            metrics, forecast_df = self.fx_train_and_forecast_rf(history, n_days)
+        elif alg == "arima":
+            metrics, forecast_df = self.fx_train_and_forecast_arima(history, n_days)
+        elif alg == "prophet":
+            metrics, forecast_df = self.fx_train_and_forecast_prophet(history, n_days)
+        else:
+            raise ValueError("Algoritmo inválido. Usa: rf, arima, prophet.")
+
+        fx_plot_div = self._fx_make_plot_div(history, forecast_df, pair_name)
+
+        # O template usa resultado.pair_name, resultado.algoritmo_label, resultado.metrics.mae, etc.
+        return {
+            "pair_name": pair_name,
+            "ticker": ticker,
+            "algoritmo": alg,
+            "algoritmo_label": self._fx_algoritmo_label(alg),
+            "n_days": int(n_days),
+            "metrics": metrics,
+            "forecast": forecast_df,
+            "fx_plot_div": fx_plot_div,
+        }
