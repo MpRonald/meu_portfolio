@@ -103,68 +103,92 @@
     <div class="d-grid gap-3"
          style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
 
-      <a class="card portfolio-card text-decoration-none" href="{{ url_for('ecom_dashboard') }}">
-        <div class="card-body text-center">
-          <h5 class="fw-semibold mb-1">📊 Sales Analysis</h5>
-          <p class="text-muted small mb-0">KPIs, revenue forecasting, and customer segmentation</p>
-        </div>
-      </a>
-
-      <a class="card portfolio-card text-decoration-none" href="{{ url_for('quotes') }}">
-        <div class="card-body text-center">
-          <h5 class="fw-semibold mb-1">📈 Markets & Stocks</h5>
-          <p class="text-muted small mb-0">Price history and predictive modeling</p>
-        </div>
-      </a>
-
-      <a class="card portfolio-card text-decoration-none" href="{{ url_for('weather') }}">
-        <div class="card-body text-center">
-          <h5 class="fw-semibold mb-1">🌦️ Weather Forecast</h5>
-          <p class="text-muted small mb-0">Open-Meteo data + interactive visualization</p>
-        </div>
-      </a>
-
-      <a class="card portfolio-card text-decoration-none" href="{{ url_for('ml_heart') }}">
-        <div class="card-body text-center">
-          <h5 class="fw-semibold mb-1">❤️ Cardiovascular Risk</h5>
-          <p class="text-muted small mb-0">10-year risk model (educational)</p>
-        </div>
-      </a>
-
-      <a class="card portfolio-card text-decoration-none" href="{{ url_for('nlp_supervised') }}">
-        <div class="card-body text-center">
-          <h5 class="fw-semibold mb-1">💬 Sentiment Analysis</h5>
-          <p class="text-muted small mb-0">Portuguese NLP with TF-IDF + ML</p>
-        </div>
-      </a>
-
-      <a class="card portfolio-card text-decoration-none" href="{{ url_for('loan_form') }}">
-        <div class="card-body text-center">
-          <h5 class="fw-semibold mb-1">🏦 Credit Risk</h5>
-          <p class="text-muted small mb-0">Probability of default analysis</p>
-        </div>
-      </a>
-
-      <a class="card portfolio-card text-decoration-none" href="{{ url_for('fx') }}">
-        <div class="card-body text-center">
-          <h5 class="fw-semibold mb-1">💱 FX Forecasting</h5>
-          <p class="text-muted small mb-0">Time series forecasting</p>
-        </div>
-      </a>
-
-      <a class="card portfolio-card text-decoration-none" href="{{ url_for('churn_xai_dashboard') }}">
-        <div class="card-body text-center">
-          <h5 class="fw-semibold mb-1">📉 Customer Churn</h5>
-          <p class="text-muted small mb-0">Predictive model with explainability</p>
-        </div>
-      </a>
-
+      {# ============================
+         ACTIVE PROJECT (KEEP)
+         ============================ #}
       <a class="card portfolio-card text-decoration-none" href="{{ url_for('ames_dashboard') }}">
         <div class="card-body text-center">
           <h5 class="fw-semibold mb-1">🏠 Real Estate Statistics</h5>
           <p class="text-muted small mb-0">Exploratory analysis using the Ames dataset</p>
         </div>
       </a>
+
+      {# ============================
+         COMMENTED / NOT USED NOW
+         ============================ #}
+
+      {#
+      <a class="card portfolio-card text-decoration-none" href="{{ url_for('ecom_dashboard') }}">
+        <div class="card-body text-center">
+          <h5 class="fw-semibold mb-1">📊 Sales Analysis</h5>
+          <p class="text-muted small mb-0">KPIs, revenue forecasting, and customer segmentation</p>
+        </div>
+      </a>
+      #}
+
+      {#
+      <a class="card portfolio-card text-decoration-none" href="{{ url_for('quotes') }}">
+        <div class="card-body text-center">
+          <h5 class="fw-semibold mb-1">📈 Markets & Stocks</h5>
+          <p class="text-muted small mb-0">Price history and predictive modeling</p>
+        </div>
+      </a>
+      #}
+
+      {#
+      <a class="card portfolio-card text-decoration-none" href="{{ url_for('weather') }}">
+        <div class="card-body text-center">
+          <h5 class="fw-semibold mb-1">🌦️ Weather Forecast</h5>
+          <p class="text-muted small mb-0">Open-Meteo data + interactive visualization</p>
+        </div>
+      </a>
+      #}
+
+      {#
+      <a class="card portfolio-card text-decoration-none" href="{{ url_for('ml_heart') }}">
+        <div class="card-body text-center">
+          <h5 class="fw-semibold mb-1">❤️ Cardiovascular Risk</h5>
+          <p class="text-muted small mb-0">10-year risk model (educational)</p>
+        </div>
+      </a>
+      #}
+
+      {#
+      <a class="card portfolio-card text-decoration-none" href="{{ url_for('nlp_supervised') }}">
+        <div class="card-body text-center">
+          <h5 class="fw-semibold mb-1">💬 Sentiment Analysis</h5>
+          <p class="text-muted small mb-0">Portuguese NLP with TF-IDF + ML</p>
+        </div>
+      </a>
+      #}
+
+      {#
+      <a class="card portfolio-card text-decoration-none" href="{{ url_for('loan_form') }}">
+        <div class="card-body text-center">
+          <h5 class="fw-semibold mb-1">🏦 Credit Risk</h5>
+          <p class="text-muted small mb-0">Probability of default analysis</p>
+        </div>
+      </a>
+      #}
+
+      {#
+      <a class="card portfolio-card text-decoration-none" href="{{ url_for('fx') }}">
+        <div class="card-body text-center">
+          <h5 class="fw-semibold mb-1">💱 FX Forecasting</h5>
+          <p class="text-muted small mb-0">Time series forecasting</p>
+        </div>
+      </a>
+      #}
+
+      {#
+      <a class="card portfolio-card text-decoration-none" href="{{ url_for('churn_xai_dashboard') }}">
+        <div class="card-body text-center">
+          <h5 class="fw-semibold mb-1">📉 Customer Churn</h5>
+          <p class="text-muted small mb-0">Predictive model with explainability</p>
+        </div>
+      </a>
+      #}
+
     </div>
   </section>
 

@@ -2,571 +2,597 @@
 {% block title %}Ames Statistics{% endblock %}
 {% block content %}
 
+<!-- Google Font (only this page, can be moved to base.html later) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
 <!-- Plotly (only this page needs it) -->
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 
-<div class="container-xl">
+<div class="container-xl ames-page">
 
-    <h1 class="mb-3">Statistical Analysis - Real Estate</h1>
-    <p class="text-muted">
-        Explore numeric variables in the housing dataset.
-        Select a variable and (optionally) a price range to visualize the distribution,
-        boxplot, summary statistics, additional tests, correlations, and the location map.
-    </p>
+  <!-- PAGE HEADER -->
+  <header class="ames-hero mb-4">
+    <div class="ames-hero-inner">
+      <div class="ames-hero-title">
+        <div class="ames-kicker">Real Estate · Statistical Analysis</div>
+        <h1 class="ames-h1">Ames Housing — Interactive Statistics</h1>
+        <p class="ames-subtitle">
+          Explore numeric variables in the dataset. Use filters to inspect distributions, outliers,
+          correlations, and geographic patterns — with statistical tests and visual diagnostics.
+        </p>
+      </div>
 
-    <!-- Filters -->
-    <form method="post" class="row g-3 mb-4">
-        <!-- Numeric variable -->
-        <div class="col-md-4">
-            <label for="variavel" class="form-label">Numeric variable</label>
-            <select class="form-select" id="variavel" name="variavel">
-                {% for v in variaveis %}
-                    <option value="{{ v }}" {% if v == variavel_selecionada %}selected{% endif %}>
-                        {{ nomes_amigaveis[v] }}
-                    </option>
-                {% endfor %}
-            </select>
+      <div class="ames-hero-chip">
+        <div class="ames-chip-row">
+          <span class="ames-chip">Plotly</span>
+          <span class="ames-chip">Statistics</span>
+          <span class="ames-chip">EDA</span>
+          <span class="ames-chip">Real Estate</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- FILTER PANEL -->
+  <section class="card ames-panel mb-4">
+    <div class="card-body">
+      <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">
+        <div>
+          <h2 class="ames-h2 mb-1">Filters</h2>
+          <p class="text-muted small mb-0">
+            Select a numeric variable and optionally restrict the price range.
+          </p>
         </div>
 
-        <!-- Price range filter -->
-        <div class="col-md-4">
-            <label for="faixa_preco" class="form-label">Price range</label>
-            <select class="form-select" id="faixa_preco" name="faixa_preco">
-                {% for f in faixas %}
-                    <option value="{{ f }}" {% if f == faixa_selecionada %}selected{% endif %}>
-                        {% if f == "Todos" %}
-                            All ranges
-                        {% else %}
-                            {{ nomes_faixa[f] }}
-                        {% endif %}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <!-- Buttons -->
-        <div class="col-md-4 d-flex align-items-end">
-            <button type="submit" class="btn btn-primary me-2">Apply filters</button>
-            <a href="{{ url_for('ames_dashboard') }}" class="btn btn-secondary">Reset</a>
-        </div>
-    </form>
-
-    <!-- Current filter info -->
-    <div class="mb-3">
-        <span class="badge bg-info text-dark">
+        <!-- ACTIVE FILTER BADGES -->
+        <div class="d-flex flex-wrap gap-2">
+          <span class="badge ames-badge ames-badge-primary">
             Variable: {{ nomes_amigaveis[variavel_selecionada] }}
-        </span>
-        <span class="badge bg-secondary">
+          </span>
+          <span class="badge ames-badge ames-badge-neutral">
             Price range:
             {% if faixa_selecionada == "Todos" %}
-                All ranges
+              All ranges
             {% else %}
-                {{ nomes_faixa[faixa_selecionada] }}
+              {{ nomes_faixa[faixa_selecionada] }}
             {% endif %}
-        </span>
-    </div>
+          </span>
+        </div>
+      </div>
 
-    <!-- Main statistics -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h6 class="card-title">Number of observations</h6>
-                    <p class="card-text fs-5">{{ estatisticas.n }}</p>
-                </div>
+      <form method="post" class="row g-3 align-items-end mt-2">
+        <div class="col-md-5">
+          <label for="variavel" class="form-label ames-label">Numeric variable</label>
+          <select class="form-select" id="variavel" name="variavel">
+            {% for v in variaveis %}
+              <option value="{{ v }}" {% if v == variavel_selecionada %}selected{% endif %}>
+                {{ nomes_amigaveis[v] }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label for="faixa_preco" class="form-label ames-label">Price range</label>
+          <select class="form-select" id="faixa_preco" name="faixa_preco">
+            {% for f in faixas %}
+              <option value="{{ f }}" {% if f == faixa_selecionada %}selected{% endif %}>
+                {% if f == "Todos" %}
+                  All ranges
+                {% else %}
+                  {{ nomes_faixa[f] }}
+                {% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-3 d-flex gap-2">
+          <button type="submit" class="btn btn-primary w-100">Apply</button>
+          <a href="{{ url_for('ames_dashboard') }}" class="btn btn-secondary w-100">Reset</a>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- KPI CARDS -->
+  <section class="mb-4">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <div class="card ames-kpi h-100">
+          <div class="card-body">
+            <div class="ames-kpi-label">Observations</div>
+            <div class="ames-kpi-value">{{ estatisticas.n }}</div>
+            <div class="ames-kpi-foot text-muted small">Filtered sample size</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="card ames-kpi h-100">
+          <div class="card-body">
+            <div class="ames-kpi-label">Mean</div>
+            <div class="ames-kpi-value">{{ "%.2f"|format(estatisticas.media) }}</div>
+            <div class="ames-kpi-foot text-muted small">Central tendency</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="card ames-kpi h-100">
+          <div class="card-body">
+            <div class="ames-kpi-label">Median</div>
+            <div class="ames-kpi-value">{{ "%.2f"|format(estatisticas.mediana) }}</div>
+            <div class="ames-kpi-foot text-muted small">Robust center</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="card ames-kpi h-100">
+          <div class="card-body">
+            <div class="ames-kpi-label">Mode</div>
+            <div class="ames-kpi-value">
+              {% if estatisticas.moda is not none %}
+                {{ "%.2f"|format(estatisticas.moda) }}
+              {% else %}
+                —
+              {% endif %}
             </div>
+            <div class="ames-kpi-foot text-muted small">Most frequent</div>
+          </div>
         </div>
+      </div>
+    </div>
 
-        <div class="col-md-3">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h6 class="card-title">Mean</h6>
-                    <p class="card-text fs-5">
-                        {{ "%.2f"|format(estatisticas.media) }}
-                    </p>
-                </div>
+    <div class="row g-3 mt-0">
+      <div class="col-md-3">
+        <div class="card ames-kpi h-100">
+          <div class="card-body">
+            <div class="ames-kpi-label">Std. Dev.</div>
+            <div class="ames-kpi-value">{{ "%.2f"|format(estatisticas.desvio_padrao) }}</div>
+            <div class="ames-kpi-foot text-muted small">Dispersion</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="card ames-kpi h-100">
+          <div class="card-body">
+            <div class="ames-kpi-label">Min</div>
+            <div class="ames-kpi-value">{{ "%.2f"|format(estatisticas.minimo) }}</div>
+            <div class="ames-kpi-foot text-muted small">Lower bound</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="card ames-kpi h-100">
+          <div class="card-body">
+            <div class="ames-kpi-label">Max</div>
+            <div class="ames-kpi-value">{{ "%.2f"|format(estatisticas.maximo) }}</div>
+            <div class="ames-kpi-foot text-muted small">Upper bound</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="card ames-kpi h-100">
+          <div class="card-body">
+            <div class="ames-kpi-label">IQR</div>
+            <div class="ames-kpi-value">{{ "%.2f"|format(estatisticas.iqr) }}</div>
+            <div class="ames-kpi-foot text-muted small">Q3 − Q1</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TESTS: NORMALITY + EXTRA -->
+  <section class="row g-3 mb-4">
+    <div class="col-lg-6">
+      <div class="card ames-card h-100">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+            <h3 class="ames-h3 mb-0">Normality (Shapiro–Wilk)</h3>
+            <span class="info-icon" data-bs-toggle="tooltip"
+              title="Tests whether the data follows a normal distribution. H0: the distribution is normal.">i</span>
+          </div>
+
+          {% if estatisticas.p_valor_shapiro is not none %}
+            <div class="ames-mono small mb-2">
+              <div><span class="text-muted">Statistic:</span> <strong>{{ "%.4f"|format(estatisticas.stat_shapiro) }}</strong></div>
+              <div><span class="text-muted">p-value:</span> <strong>{{ "%.6f"|format(estatisticas.p_valor_shapiro) }}</strong></div>
             </div>
+            <div class="text-muted small">{{ interpretacao_normalidade }}</div>
+          {% else %}
+            <p class="text-muted mb-0">Could not compute the normality test for this variable.</p>
+          {% endif %}
         </div>
+      </div>
+    </div>
 
-        <div class="col-md-3">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h6 class="card-title">Median</h6>
-                    <p class="card-text fs-5">
-                        {{ "%.2f"|format(estatisticas.mediana) }}
-                    </p>
-                </div>
+    <div class="col-lg-6">
+      <div class="card ames-card h-100">
+        <div class="card-body">
+          <h3 class="ames-h3 mb-2">Additional tests</h3>
+
+          <!-- Jarque–Bera -->
+          <div class="ames-test">
+            <div class="d-flex align-items-center justify-content-between">
+              <strong>Jarque–Bera</strong>
+              <span class="info-icon" data-bs-toggle="tooltip"
+                title="Tests normality based on skewness and kurtosis. H0: the distribution is normal.">i</span>
             </div>
-        </div>
+            {% if testes_extra.jb_p is not none %}
+              <div class="ames-mono small">
+                Statistic: <strong>{{ "%.4f"|format(testes_extra.jb_stat) }}</strong> ·
+                p-value: <strong>{{ "%.6f"|format(testes_extra.jb_p) }}</strong>
+              </div>
+              <div class="text-muted small mt-1">
+                {% if testes_extra.jb_p < 0.05 %}
+                  p &lt; 0.05 ⇒ reject normality (distribution is not normal).
+                {% else %}
+                  p ≥ 0.05 ⇒ fail to reject normality (approximately normal).
+                {% endif %}
+              </div>
+            {% else %}
+              <div class="text-muted small">Could not compute.</div>
+            {% endif %}
+          </div>
 
-        <div class="col-md-3">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h6 class="card-title">Mode</h6>
-                    <p class="card-text fs-5">
-                        {% if estatisticas.moda is not none %}
-                            {{ "%.2f"|format(estatisticas.moda) }}
-                        {% else %}
-                            -
-                        {% endif %}
-                    </p>
-                </div>
+          <hr class="ames-hr">
+
+          <!-- Pearson price -->
+          <div class="ames-test">
+            <div class="d-flex align-items-center justify-content-between">
+              <strong>Pearson with Price (€)</strong>
+              <span class="info-icon" data-bs-toggle="tooltip"
+                title="Linear relationship between the selected variable and price. H0: r = 0.">i</span>
             </div>
-        </div>
-    </div>
+            {% if testes_extra.corr_preco_r is not none %}
+              <div class="ames-mono small">
+                r: <strong>{{ "%.3f"|format(testes_extra.corr_preco_r) }}</strong> ·
+                p-value: <strong>{{ "%.6f"|format(testes_extra.corr_preco_p) }}</strong>
+              </div>
+              <div class="text-muted small mt-1">
+                {% if testes_extra.corr_preco_p < 0.05 %}
+                  Statistically significant linear correlation.
+                {% else %}
+                  No evidence of significant linear correlation.
+                {% endif %}
+              </div>
+            {% else %}
+              <div class="text-muted small">Could not compute.</div>
+            {% endif %}
+          </div>
 
-    <!-- More statistics -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h6 class="card-title">Standard deviation</h6>
-                    <p class="card-text fs-5">
-                        {{ "%.2f"|format(estatisticas.desvio_padrao) }}
-                    </p>
-                </div>
+          <!-- Pearson m2 -->
+          <div class="ames-test mt-3">
+            <div class="d-flex align-items-center justify-content-between">
+              <strong>Pearson with Price per m² (€)</strong>
+              <span class="info-icon" data-bs-toggle="tooltip"
+                title="Linear relationship between the selected variable and price per square meter. H0: r = 0.">i</span>
             </div>
-        </div>
+            {% if testes_extra.corr_preco_m2_r is not none %}
+              <div class="ames-mono small">
+                r: <strong>{{ "%.3f"|format(testes_extra.corr_preco_m2_r) }}</strong> ·
+                p-value: <strong>{{ "%.6f"|format(testes_extra.corr_preco_m2_p) }}</strong>
+              </div>
+              <div class="text-muted small mt-1">
+                {% if testes_extra.corr_preco_m2_p < 0.05 %}
+                  Statistically significant linear correlation.
+                {% else %}
+                  No evidence of significant linear correlation.
+                {% endif %}
+              </div>
+            {% else %}
+              <div class="text-muted small">Could not compute.</div>
+            {% endif %}
+          </div>
 
-        <div class="col-md-3">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h6 class="card-title">Minimum</h6>
-                    <p class="card-text fs-5">
-                        {{ "%.2f"|format(estatisticas.minimo) }}
-                    </p>
-                </div>
+          <hr class="ames-hr">
+
+          <!-- Spearman -->
+          <div class="ames-test">
+            <div class="d-flex align-items-center justify-content-between">
+              <strong>Spearman with Price (€)</strong>
+              <span class="info-icon" data-bs-toggle="tooltip"
+                title="Rank-based monotonic relationship. More robust to outliers. H0: ρ = 0.">i</span>
             </div>
-        </div>
+            {% if testes_extra.corr_spearman_r is not none %}
+              <div class="ames-mono small">
+                ρ: <strong>{{ "%.3f"|format(testes_extra.corr_spearman_r) }}</strong> ·
+                p-value: <strong>{{ "%.6f"|format(testes_extra.corr_spearman_p) }}</strong>
+              </div>
+              <div class="text-muted small mt-1">
+                {% if testes_extra.corr_spearman_p < 0.05 %}
+                  Statistically significant monotonic correlation.
+                {% else %}
+                  No evidence of significant monotonic correlation.
+                {% endif %}
+              </div>
+            {% else %}
+              <div class="text-muted small">Could not compute.</div>
+            {% endif %}
+          </div>
 
-        <div class="col-md-3">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h6 class="card-title">Maximum</h6>
-                    <p class="card-text fs-5">
-                        {{ "%.2f"|format(estatisticas.maximo) }}
-                    </p>
-                </div>
+          <hr class="ames-hr">
+
+          <!-- Kruskal -->
+          <div class="ames-test">
+            <div class="d-flex align-items-center justify-content-between">
+              <strong>Kruskal–Wallis by price range</strong>
+              <span class="info-icon" data-bs-toggle="tooltip"
+                title="Compares the distribution across price ranges without assuming normality. H0: all ranges have the same distribution.">i</span>
             </div>
-        </div>
+            {% if testes_extra.kruskal_p is not none %}
+              <div class="ames-mono small">
+                H: <strong>{{ "%.4f"|format(testes_extra.kruskal_H) }}</strong> ·
+                p-value: <strong>{{ "%.6f"|format(testes_extra.kruskal_p) }}</strong>
+              </div>
+              <div class="text-muted small mt-1">
+                {% if testes_extra.kruskal_p < 0.05 %}
+                  At least one range differs significantly.
+                {% else %}
+                  No evidence of significant differences between ranges.
+                {% endif %}
+              </div>
+            {% else %}
+              <div class="text-muted small">Could not compute (insufficient data per range).</div>
+            {% endif %}
+          </div>
 
-        <div class="col-md-3">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h6 class="card-title">IQR (Q3 - Q1)</h6>
-                    <p class="card-text fs-5">
-                        {{ "%.2f"|format(estatisticas.iqr) }}
-                    </p>
-                </div>
+          <hr class="ames-hr">
+
+          <!-- Regression -->
+          <div class="ames-test">
+            <div class="d-flex align-items-center justify-content-between">
+              <strong>Linear regression: Price ~ {{ nomes_amigaveis[variavel_selecionada] }}</strong>
+              <span class="info-icon" data-bs-toggle="tooltip"
+                title="Models price as a function of the selected variable. H0: β₁ = 0.">i</span>
             </div>
+            {% if testes_extra.reg_r2 is not none %}
+              <div class="ames-mono small">
+                R²: <strong>{{ "%.3f"|format(testes_extra.reg_r2) }}</strong><br>
+                β₀: <strong>{{ "%.2f"|format(testes_extra.reg_beta0) }}</strong> ·
+                β₁: <strong>{{ "%.2f"|format(testes_extra.reg_beta1) }}</strong><br>
+                p(β₁): <strong>{{ "%.6f"|format(testes_extra.reg_p_beta1) }}</strong>
+              </div>
+              <div class="text-muted small mt-1">
+                {% if testes_extra.reg_p_beta1 < 0.05 %}
+                  The selected variable is a statistically significant predictor of price.
+                {% else %}
+                  No evidence that the selected variable explains price.
+                {% endif %}
+              </div>
+            {% else %}
+              <div class="text-muted small">Could not compute (check price column and sample size).</div>
+            {% endif %}
+          </div>
+
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CORRELATION MATRIX -->
+  <section class="card ames-card mb-4">
+    <div class="card-body">
+      <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+        <div>
+          <h3 class="ames-h3 mb-1">
+            Correlation matrix (Pearson)
+          </h3>
+          <p class="text-muted small mb-0">
+            Strength and direction of linear relationships among main numeric variables.
+          </p>
+        </div>
+        <span class="info-icon" data-bs-toggle="tooltip"
+          title="Values near 1 or -1 indicate strong correlation; values near 0 indicate weak correlation.">i</span>
+      </div>
+
+      <div class="ames-chart mt-3">
+        <div id="heatmap_corr" class="ames-plot ames-plot-tall"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DISTRIBUTION -->
+  <section class="row g-3 mb-4">
+    <div class="col-lg-6">
+      <div class="card ames-card h-100">
+        <div class="card-body">
+          <h3 class="ames-h3 mb-2">Histogram</h3>
+          <div class="ames-chart">
+            <div id="histograma" class="ames-plot"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Normality (Shapiro-Wilk) -->
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h6 class="card-title">
-                        Normality test (Shapiro–Wilk)
-                        <span class="text-primary ms-1"
-                              style="cursor:pointer; font-weight:bold;"
-                              data-bs-toggle="tooltip"
-                              title="Tests whether the data follows a normal distribution. H0: the distribution is normal.">
-                            ⓘ
-                        </span>
-                    </h6>
-                    {% if estatisticas.p_valor_shapiro is not none %}
-                        <p class="mb-1">
-                            Statistic: {{ "%.4f"|format(estatisticas.stat_shapiro) }}<br>
-                            p-value: {{ "%.6f"|format(estatisticas.p_valor_shapiro) }}
-                        </p>
-                        <p class="text-muted">
-                            {{ interpretacao_normalidade }}
-                        </p>
-                    {% else %}
-                        <p>Could not compute the normality test for this variable.</p>
-                    {% endif %}
-                </div>
-            </div>
+    <div class="col-lg-6">
+      <div class="card ames-card h-100">
+        <div class="card-body">
+          <h3 class="ames-h3 mb-2">Boxplot</h3>
+          <div class="ames-chart">
+            <div id="boxplot" class="ames-plot"></div>
+          </div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- NEIGHBORHOODS -->
+  {% if graph_box_bairro_json %}
+  <section class="card ames-card mb-4">
+    <div class="card-body">
+      <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+        <div>
+          <h3 class="ames-h3 mb-1">Price distribution by neighborhood</h3>
+          <p class="text-muted small mb-0">
+            Compare median, quartiles, and outliers across neighborhoods.
+          </p>
+        </div>
+        <span class="info-icon" data-bs-toggle="tooltip"
+          title="Each box shows median, quartiles and potential outliers.">i</span>
+      </div>
+
+      <div class="ames-chart mt-3">
+        <div id="boxplot_bairro" class="ames-plot ames-plot-tall"></div>
+      </div>
+
+      {% if graph_bar_bairro_json %}
+      <hr class="ames-hr my-4">
+
+      <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+        <div>
+          <h3 class="ames-h3 mb-1">Average price by neighborhood</h3>
+          <p class="text-muted small mb-0">
+            Neighborhoods ordered by average price.
+          </p>
+        </div>
+        <span class="info-icon" data-bs-toggle="tooltip"
+          title="Ranks neighborhoods from most expensive to least expensive based on average price.">i</span>
+      </div>
+
+      <div class="ames-chart mt-3">
+        <div id="bar_bairro" class="ames-plot ames-plot-tall"></div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- SCATTERS -->
+  <section class="row g-3 mb-4">
+    <div class="col-lg-6">
+      <div class="card ames-card h-100">
+        <div class="card-body">
+          <h3 class="ames-h3 mb-2">Scatter: Price vs {{ nomes_amigaveis[variavel_selecionada] }}</h3>
+          <div class="ames-chart">
+            <div id="scatter_preco" class="ames-plot"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Additional statistical tests -->
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h6 class="card-title">Additional statistical tests</h6>
-
-                    <!-- Jarque–Bera -->
-                    {% if testes_extra.jb_p is not none %}
-                        <p class="mb-1">
-                            <strong>
-                                Normality test (Jarque–Bera)
-                                <span class="text-primary ms-1"
-                                      style="cursor:pointer; font-weight:bold;"
-                                      data-bs-toggle="tooltip"
-                                      title="Tests normality based on skewness and kurtosis. H0: the distribution is normal.">
-                                    ⓘ
-                                </span>
-                            </strong><br>
-                            Statistic: {{ "%.4f"|format(testes_extra.jb_stat) }}<br>
-                            p-value: {{ "%.6f"|format(testes_extra.jb_p) }}
-                        </p>
-                        <p class="text-muted">
-                            {% if testes_extra.jb_p < 0.05 %}
-                                p &lt; 0.05 ⇒ reject normality (distribution is not normal).
-                            {% else %}
-                                p ≥ 0.05 ⇒ fail to reject normality (distribution is approximately normal).
-                            {% endif %}
-                        </p>
-                    {% else %}
-                        <p>Could not compute the Jarque–Bera test.</p>
-                    {% endif %}
-
-                    <hr>
-
-                    <!-- Pearson correlation with price -->
-                    {% if testes_extra.corr_preco_r is not none %}
-                        <p class="mb-1">
-                            <strong>
-                                Pearson correlation with Property Price (€)
-                                <span class="text-primary ms-1"
-                                      style="cursor:pointer; font-weight:bold;"
-                                      data-bs-toggle="tooltip"
-                                      title="Measures the strength and direction of the linear relationship between the selected variable and price. H0: r = 0 (no linear correlation).">
-                                    ⓘ
-                                </span>
-                            </strong><br>
-                            r = {{ "%.3f"|format(testes_extra.corr_preco_r) }}<br>
-                            p-value: {{ "%.6f"|format(testes_extra.corr_preco_p) }}
-                        </p>
-                        <p class="text-muted">
-                            {% if testes_extra.corr_preco_p < 0.05 %}
-                                p &lt; 0.05 ⇒ statistically significant linear correlation.
-                            {% else %}
-                                p ≥ 0.05 ⇒ no evidence of a statistically significant linear correlation.
-                            {% endif %}
-                        </p>
-                    {% else %}
-                        <p class="mb-1">
-                            <strong>Pearson correlation with Property Price (€)</strong><br>
-                            Could not compute.
-                        </p>
-                    {% endif %}
-
-                    <!-- Pearson correlation with price per m² -->
-                    {% if testes_extra.corr_preco_m2_r is not none %}
-                        <p class="mb-1">
-                            <strong>
-                                Pearson correlation with Price per m² (€)
-                                <span class="text-primary ms-1"
-                                      style="cursor:pointer; font-weight:bold;"
-                                      data-bs-toggle="tooltip"
-                                      title="Measures the linear relationship between the selected variable and the price per square meter. H0: r = 0.">
-                                    ⓘ
-                                </span>
-                            </strong><br>
-                            r = {{ "%.3f"|format(testes_extra.corr_preco_m2_r) }}<br>
-                            p-value: {{ "%.6f"|format(testes_extra.corr_preco_m2_p) }}
-                        </p>
-                        <p class="text-muted">
-                            {% if testes_extra.corr_preco_m2_p < 0.05 %}
-                                p &lt; 0.05 ⇒ statistically significant linear correlation.
-                            {% else %}
-                                p ≥ 0.05 ⇒ no evidence of a statistically significant linear correlation.
-                            {% endif %}
-                        </p>
-                    {% else %}
-                        <p class="mb-1">
-                            <strong>Pearson correlation with Price per m² (€)</strong><br>
-                            Could not compute.
-                        </p>
-                    {% endif %}
-
-                    <hr>
-
-                    <!-- Spearman correlation with price -->
-                    {% if testes_extra.corr_spearman_r is not none %}
-                        <p class="mb-1">
-                            <strong>
-                                Spearman correlation with Property Price (€)
-                                <span class="text-primary ms-1"
-                                      style="cursor:pointer; font-weight:bold;"
-                                      data-bs-toggle="tooltip"
-                                      title="Measures a monotonic relationship (rank-based), more robust to outliers and does not require linearity. H0: ρ = 0 (no monotonic correlation).">
-                                    ⓘ
-                                </span>
-                            </strong><br>
-                            ρ (rho) = {{ "%.3f"|format(testes_extra.corr_spearman_r) }}<br>
-                            p-value: {{ "%.6f"|format(testes_extra.corr_spearman_p) }}
-                        </p>
-                        <p class="text-muted">
-                            {% if testes_extra.corr_spearman_p < 0.05 %}
-                                p &lt; 0.05 ⇒ statistically significant monotonic correlation.
-                            {% else %}
-                                p ≥ 0.05 ⇒ no evidence of a statistically significant monotonic correlation.
-                            {% endif %}
-                        </p>
-                    {% else %}
-                        <p class="mb-1">
-                            <strong>Spearman correlation with Property Price (€)</strong><br>
-                            Could not compute.
-                        </p>
-                    {% endif %}
-
-                    <hr>
-
-                    <!-- Kruskal–Wallis by price range -->
-                    {% if testes_extra.kruskal_p is not none %}
-                        <p class="mb-1">
-                            <strong>
-                                Kruskal–Wallis test by price range
-                                <span class="text-primary ms-1"
-                                      style="cursor:pointer; font-weight:bold;"
-                                      data-bs-toggle="tooltip"
-                                      title="Compares the distribution of the variable across price ranges (low, medium, high, etc.) without assuming normality. H0: all ranges have the same distribution.">
-                                    ⓘ
-                                </span>
-                            </strong><br>
-                            H = {{ "%.4f"|format(testes_extra.kruskal_H) }}<br>
-                            p-value: {{ "%.6f"|format(testes_extra.kruskal_p) }}
-                        </p>
-                        <p class="text-muted">
-                            {% if testes_extra.kruskal_p < 0.05 %}
-                                p &lt; 0.05 ⇒ at least one price range has a different distribution for this variable.
-                            {% else %}
-                                p ≥ 0.05 ⇒ no evidence of a significant difference between price ranges.
-                            {% endif %}
-                        </p>
-                    {% else %}
-                        <p class="mb-1">
-                            <strong>Kruskal–Wallis test by price range</strong><br>
-                            Could not compute (check whether there is enough data in each range).
-                        </p>
-                    {% endif %}
-
-                    <hr>
-
-                    <!-- Simple linear regression (var -> price) -->
-                    {% if testes_extra.reg_r2 is not none %}
-                        <p class="mb-1">
-                            <strong>
-                                Simple linear regression: Price ~ {{ nomes_amigaveis[variavel_selecionada] }}
-                                <span class="text-primary ms-1"
-                                      style="cursor:pointer; font-weight:bold;"
-                                      data-bs-toggle="tooltip"
-                                      title="Models price as a function of the selected variable. β₁ indicates how price changes on average for each unit increase in the variable. H0: β₁ = 0 (the variable does not explain price).">
-                                    ⓘ
-                                </span>
-                            </strong><br>
-                            R² = {{ "%.3f"|format(testes_extra.reg_r2) }}<br>
-                            Intercept (β₀) = {{ "%.2f"|format(testes_extra.reg_beta0) }}<br>
-                            Coefficient (β₁) = {{ "%.2f"|format(testes_extra.reg_beta1) }}<br>
-                            p-value for β₁: {{ "%.6f"|format(testes_extra.reg_p_beta1) }}
-                        </p>
-                        <p class="text-muted">
-                            {% if testes_extra.reg_p_beta1 < 0.05 %}
-                                p &lt; 0.05 ⇒ the selected variable is a statistically significant predictor of price.
-                            {% else %}
-                                p ≥ 0.05 ⇒ no evidence that the selected variable explains price.
-                            {% endif %}
-                        </p>
-                    {% else %}
-                        <p class="mb-0">
-                            <strong>Simple linear regression: Price ~ {{ nomes_amigaveis[variavel_selecionada] }}</strong><br>
-                            Could not compute (check whether the <code>preco</code> column exists and there is enough data).
-                        </p>
-                    {% endif %}
-
-                </div>
-            </div>
+    <div class="col-lg-6">
+      <div class="card ames-card h-100">
+        <div class="card-body">
+          <h3 class="ames-h3 mb-2">{{ nomes_amigaveis[variavel_selecionada] }} by price range</h3>
+          <div class="ames-chart">
+            <div id="boxplot_faixa" class="ames-plot"></div>
+          </div>
         </div>
+      </div>
     </div>
+  </section>
 
-    <!-- Correlation heatmap -->
-    <div class="row mb-4">
-        <div class="col-md-12 mb-4">
-            <h4>
-                Correlation matrix (Pearson)
-                <span class="text-primary ms-1"
-                      style="cursor:pointer; font-weight:bold;"
-                      data-bs-toggle="tooltip"
-                      title="Shows the strength and direction of the linear relationship between key numeric variables. Values near 1 or -1 indicate strong correlation; values near 0 indicate weak correlation.">
-                    ⓘ
-                </span>
-            </h4>
-            <p class="text-muted small">
-                The matrix below uses only the main numeric variables (price, price per m²,
-                area, rooms, etc.). Values range from -1 (perfect negative correlation) to 1 (perfect positive correlation).
-            </p>
-            <div id="heatmap_corr" style="height:800px; max-width:100%;"></div>
+  <!-- YEAR BUILT -->
+  <section class="card ames-card mb-4">
+    <div class="card-body">
+      <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+        <div>
+          <h3 class="ames-h3 mb-1">Property price over Year Built</h3>
+          <p class="text-muted small mb-0">Each point is a property; colors may represent price ranges.</p>
         </div>
+        <span class="info-icon" data-bs-toggle="tooltip"
+          title="Shows how price varies as a function of year built. Useful to identify appreciation trends.">i</span>
+      </div>
+
+      <div class="ames-chart mt-3">
+        <div id="scatter_preco_ano" class="ames-plot ames-plot-tall"></div>
+      </div>
     </div>
+  </section>
 
-    <!-- Basic charts -->
-    <div class="row mb-4">
-        <div class="col-md-12 mb-4">
-            <h4>Histogram</h4>
-            <div id="histograma"></div>
+  <!-- MAP -->
+  <section class="card ames-card mb-2">
+    <div class="card-body">
+      <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+        <div>
+          <h3 class="ames-h3 mb-1">Properties map</h3>
+          <p class="text-muted small mb-0">
+            Shows the geographic location of filtered properties (latitude/longitude).
+          </p>
         </div>
+        <span class="info-icon" data-bs-toggle="tooltip"
+          title="Uses only rows with valid lat/lon. Colors represent price ranges when available.">i</span>
+      </div>
 
-        <div class="col-md-12 mb-4">
-            <h4>Boxplot</h4>
-            <div id="boxplot"></div>
-        </div>
+      <div class="ames-chart mt-3">
+        <div id="mapa_imoveis" class="ames-plot ames-plot-map"></div>
+      </div>
     </div>
-
-    <!-- Price by Neighborhood (only if data exists) -->
-    {% if graph_box_bairro_json %}
-    <div class="row mb-4">
-        <div class="col-md-12 mb-4">
-            <h4>
-                Price distribution by neighborhood
-                <span class="text-primary ms-1"
-                      style="cursor:pointer; font-weight:bold;"
-                      data-bs-toggle="tooltip"
-                      title="Compares the price distribution across neighborhoods. Each boxplot shows median, quartiles, and potential outliers.">
-                    ⓘ
-                </span>
-            </h4>
-            <p class="text-muted small">
-                Useful to identify more expensive or cheaper neighborhoods and the price variability within each area.
-            </p>
-            <div id="boxplot_bairro"></div>
-        </div>
-
-        {% if graph_bar_bairro_json %}
-        <div class="col-md-12 mb-4">
-            <h4>
-                Average price by neighborhood
-                <span class="text-primary ms-1"
-                      style="cursor:pointer; font-weight:bold;"
-                      data-bs-toggle="tooltip"
-                      title="Shows the average property price per neighborhood, allowing you to rank the most valued areas.">
-                    ⓘ
-                </span>
-            </h4>
-            <p class="text-muted small">
-                Neighborhoods are ordered from most expensive to least expensive based on average price.
-            </p>
-            <div id="bar_bairro"></div>
-        </div>
-        {% endif %}
-    </div>
-    {% endif %}
-
-    <!-- Additional charts: scatter and boxplot by range -->
-    <div class="row mb-4">
-        <div class="col-md-12 mb-4">
-            <h4>
-                Scatter: Price vs {{ nomes_amigaveis[variavel_selecionada] }}
-            </h4>
-            <div id="scatter_preco"></div>
-        </div>
-
-        <div class="col-md-12 mb-4">
-            <h4>
-                {{ nomes_amigaveis[variavel_selecionada] }} by price range
-            </h4>
-            <div id="boxplot_faixa"></div>
-        </div>
-    </div>
-
-    <!-- Price vs Year Built -->
-    <div class="row mb-4">
-        <div class="col-md-12 mb-4">
-            <h4>
-                Property price over Year Built
-                <span class="text-primary ms-1"
-                      style="cursor:pointer; font-weight:bold;"
-                      data-bs-toggle="tooltip"
-                      title="Shows how property price varies as a function of year built. Useful to identify appreciation trends over time.">
-                    ⓘ
-                </span>
-            </h4>
-            <p class="text-muted small">
-                Each point represents a property. Colors indicate the price range (when available).
-            </p>
-            <div id="scatter_preco_ano"></div>
-        </div>
-    </div>
-
-    <!-- Properties map -->
-    <div class="row mb-4">
-        <div class="col-md-12 mb-4">
-            <h4>
-                Properties map (latitude and longitude)
-                <span class="text-primary ms-1"
-                      style="cursor:pointer; font-weight:bold;"
-                      data-bs-toggle="tooltip"
-                      title="Shows the geographic location of the filtered properties. Colors represent price ranges; point size may represent absolute price.">
-                    ⓘ
-                </span>
-            </h4>
-            <p class="text-muted small">
-                The map uses only properties with valid latitude and longitude and respects the filters selected above.
-            </p>
-            <div id="mapa_imoveis" style="height:550px;"></div>
-        </div>
-    </div>
+  </section>
 
 </div> <!-- end container -->
 
-<!-- CHART SCRIPTS (Plotly loaded above) -->
+<!-- CHART SCRIPTS -->
 <script>
-    // Histogram and Boxplot
-    var histData = {{ graph_hist_json | safe }};
-    var boxData  = {{ graph_box_json  | safe }};
-    Plotly.newPlot('histograma', histData.data, histData.layout);
-    Plotly.newPlot('boxplot',    boxData.data,  boxData.layout);
+  const PLOT_CONFIG = {
+    responsive: true,
+    displayModeBar: true,
+    displaylogo: false,
+    modeBarButtonsToRemove: [
+      "autoScale2d","select2d","lasso2d","zoomIn2d","zoomOut2d"
+    ]
+  };
 
-    // Scatter: Price vs selected variable
-    {% if graph_scatter_json %}
-        var scatterData = {{ graph_scatter_json | safe }};
-        Plotly.newPlot('scatter_preco', scatterData.data, scatterData.layout);
-    {% endif %}
+  // Histogram and Boxplot
+  var histData = {{ graph_hist_json | safe }};
+  var boxData  = {{ graph_box_json  | safe }};
+  Plotly.newPlot('histograma', histData.data, histData.layout, PLOT_CONFIG);
+  Plotly.newPlot('boxplot',    boxData.data,  boxData.layout,  PLOT_CONFIG);
 
-    // Boxplot by price range
-    {% if graph_box_faixa_json %}
-        var boxFaixaData = {{ graph_box_faixa_json | safe }};
-        Plotly.newPlot('boxplot_faixa', boxFaixaData.data, boxFaixaData.layout);
-    {% endif %}
+  // Scatter: Price vs selected variable
+  {% if graph_scatter_json %}
+    var scatterData = {{ graph_scatter_json | safe }};
+    Plotly.newPlot('scatter_preco', scatterData.data, scatterData.layout, PLOT_CONFIG);
+  {% endif %}
 
-    // Price vs Year Built
-    {% if graph_preco_ano_json %}
-        var scatterAnoData = {{ graph_preco_ano_json | safe }};
-        Plotly.newPlot('scatter_preco_ano', scatterAnoData.data, scatterAnoData.layout);
-    {% endif %}
+  // Boxplot by price range
+  {% if graph_box_faixa_json %}
+    var boxFaixaData = {{ graph_box_faixa_json | safe }};
+    Plotly.newPlot('boxplot_faixa', boxFaixaData.data, boxFaixaData.layout, PLOT_CONFIG);
+  {% endif %}
 
-    // Price by neighborhood (boxplot)
-    {% if graph_box_bairro_json %}
-        var boxBairroData = {{ graph_box_bairro_json | safe }};
-        Plotly.newPlot('boxplot_bairro', boxBairroData.data, boxBairroData.layout);
-    {% endif %}
+  // Price vs Year Built
+  {% if graph_preco_ano_json %}
+    var scatterAnoData = {{ graph_preco_ano_json | safe }};
+    Plotly.newPlot('scatter_preco_ano', scatterAnoData.data, scatterAnoData.layout, PLOT_CONFIG);
+  {% endif %}
 
-    // Average price by neighborhood (bar chart)
-    {% if graph_bar_bairro_json %}
-        var barBairroData = {{ graph_bar_bairro_json | safe }};
-        Plotly.newPlot('bar_bairro', barBairroData.data, barBairroData.layout);
-    {% endif %}
+  // Price by neighborhood (boxplot)
+  {% if graph_box_bairro_json %}
+    var boxBairroData = {{ graph_box_bairro_json | safe }};
+    Plotly.newPlot('boxplot_bairro', boxBairroData.data, boxBairroData.layout, PLOT_CONFIG);
+  {% endif %}
 
-    // Correlation heatmap
-    {% if graph_heatmap_json %}
-        var heatData = {{ graph_heatmap_json | safe }};
-        Plotly.newPlot('heatmap_corr', heatData.data, heatData.layout, {responsive: true});
-    {% endif %}
+  // Average price by neighborhood (bar chart)
+  {% if graph_bar_bairro_json %}
+    var barBairroData = {{ graph_bar_bairro_json | safe }};
+    Plotly.newPlot('bar_bairro', barBairroData.data, barBairroData.layout, PLOT_CONFIG);
+  {% endif %}
 
-    // Properties map (lat/lon)
-    {% if graph_map_json %}
-        var mapData = {{ graph_map_json | safe }};
-        Plotly.newPlot('mapa_imoveis', mapData.data, mapData.layout, {responsive: true});
-    {% endif %}
+  // Correlation heatmap
+  {% if graph_heatmap_json %}
+    var heatData = {{ graph_heatmap_json | safe }};
+    Plotly.newPlot('heatmap_corr', heatData.data, heatData.layout, PLOT_CONFIG);
+  {% endif %}
 
-    // Initialize Bootstrap tooltips (Bootstrap already in base.html)
-    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-    const tooltipList = [...tooltipTriggerList].map(el => new bootstrap.Tooltip(el));
+  // Properties map (lat/lon)
+  {% if graph_map_json %}
+    var mapData = {{ graph_map_json | safe }};
+    Plotly.newPlot('mapa_imoveis', mapData.data, mapData.layout, PLOT_CONFIG);
+  {% endif %}
+
+  // Bootstrap tooltips
+  const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+  [...tooltipTriggerList].map(el => new bootstrap.Tooltip(el));
 </script>
 
 {% endblock %}

@@ -659,3 +659,202 @@ a:hover {
   transform: translateY(-4px);
   box-shadow: 0 6px 14px rgba(0,0,0,0.07);
 }
+
+
+/* ======================================================
+   AMES PAGE · PREMIUM STYLE
+   ====================================================== */
+
+.ames-page {
+  font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+.ames-hero {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 45%, #eef2ff 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 18px 18px 16px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.ames-hero-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.ames-kicker {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.ames-h1 {
+  margin: 6px 0 6px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+.ames-subtitle {
+  margin: 0;
+  max-width: 860px;
+  color: #64748b;
+  font-size: 0.98rem;
+  line-height: 1.5;
+}
+
+.ames-hero-chip {
+  margin-top: 2px;
+}
+
+.ames-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.ames-chip {
+  font-size: 0.75rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  background: rgba(255, 255, 255, 0.65);
+  color: #475569;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.ames-panel {
+  border-radius: 16px !important;
+}
+
+.ames-label {
+  font-weight: 600;
+  color: #475569;
+}
+
+.ames-badge {
+  border-radius: 999px !important;
+  padding: 8px 10px !important;
+  font-weight: 600;
+  font-size: 0.78rem;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+}
+
+.ames-badge-primary {
+  background: rgba(14, 165, 233, 0.10) !important;
+  color: #0369a1 !important;
+  border-color: rgba(14, 165, 233, 0.35) !important;
+}
+
+.ames-badge-neutral {
+  background: rgba(15, 23, 42, 0.04) !important;
+  color: #475569 !important;
+}
+
+.ames-kpi {
+  border-radius: 16px !important;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.ames-kpi .card-body {
+  padding: 14px 16px;
+}
+
+.ames-kpi-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.ames-kpi-value {
+  margin-top: 6px;
+  font-size: 1.35rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+.ames-kpi-foot {
+  margin-top: 6px;
+}
+
+.ames-card {
+  border-radius: 16px !important;
+  padding: 0 !important;
+}
+
+.ames-card .card-body {
+  padding: 16px 16px;
+}
+
+.ames-h2 {
+  font-size: 1.05rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+.ames-h3 {
+  font-size: 1.02rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+.ames-hr {
+  border: none;
+  height: 1px;
+  background: rgba(148, 163, 184, 0.45);
+  margin: 14px 0;
+}
+
+.ames-test {
+  padding: 10px 10px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.02);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.ames-mono {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.ames-chart {
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 1);
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
+.ames-plot {
+  width: 100%;
+  min-height: 360px;
+}
+
+.ames-plot-tall {
+  min-height: 560px;
+}
+
+.ames-plot-map {
+  min-height: 520px;
+}
+
+@media (max-width: 992px) {
+  .ames-chip-row { justify-content: flex-start; }
+}
+
+@media (max-width: 768px) {
+  .ames-plot { min-height: 320px; }
+  .ames-plot-tall { min-height: 420px; }
+}
