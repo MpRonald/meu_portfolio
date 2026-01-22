@@ -103,6 +103,13 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
+    # ✅ Inject current year into all templates (base.html footer, etc.)
+    from datetime import datetime
+
+    @app.context_processor
+    def inject_current_year():
+        return {"current_year": datetime.now().year}
+
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-change-me")
     env = (os.getenv("FLASK_ENV") or os.getenv("ENV") or "production").lower().strip()
     app.config["ENV_NAME"] = env
