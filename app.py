@@ -3,6 +3,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 import plotly
@@ -94,19 +95,24 @@ def _configure_logging(app: Flask) -> None:
     )
 
 
-def _load_walmart_sales_csv(data_dir: Path) -> pd.DataFrame:
-    """
-    Procura Walmart.csv / walmart.csv dentro de data_dir.
-    """
-    candidates = [
-        data_dir / "Walmart.csv",
-        data_dir / "walmart.csv",
-    ]
-    csv_path = None
-    for p in candidates:
-        if p.exists():
-            csv_path = p
-            break
+def _empty_fig(title: str = "") -> dict:
+    fig = px.scatter(pd.DataFrame({"x": [], "y": []}), x="x", y="y", title=title)
+    fig.update_layout(
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+        annotations=[dict(
+            text="No data for the selected filters",
+            x=0.5, y=0.5, xref="paper", yref="paper",
+            showarrow=False
+        )],
+        margin=dict(l=10, r=10, t=50, b=10),
+    )
+    return fig
+
+
+def _load_walmart_csv(data_dir: Path) -> pd.DataFrame:
+    candidates = [data_dir / "Walmart.csv", data_dir / "walmart.csv"]
+    csv_path = next((p for p in candidates if p.exists()), None)
     if csv_path is None:
         raise FileNotFoundError(
             f"CSV do Walmart não encontrado em {data_dir}. "
@@ -115,28 +121,62 @@ def _load_walmart_sales_csv(data_dir: Path) -> pd.DataFrame:
 
     df = pd.read_csv(csv_path)
 
-    # Normaliza datas
+    # Tipos / normalização básica
     if "transaction_date" in df.columns:
         df["transaction_date"] = pd.to_datetime(df["transaction_date"], errors="coerce")
-    # Medidas úteis
-    if {"quantity_sold", "unit_price"}.issubset(df.columns):
-        df["revenue"] = pd.to_numeric(df["quantity_sold"], errors="coerce") * pd.to_numeric(df["unit_price"], errors="coerce")
+
+    for c in ["quantity_sold", "unit_price", "forecasted_demand", "actual_demand"]:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+
+    # Revenue: tenta inferir de quantity * unit_price
+    if "revenue" not in df.columns and {"quantity_sold", "unit_price"}.issubset(df.columns):
+        df["revenue"] = df["quantity_sold"] * df["unit_price"]
+    if "revenue" in df.columns:
+        df["revenue"] = pd.to_numeric(df["revenue"], errors="coerce")
 
     # Booleans
+    bool_map = {"true": True, "false": False, "1": True, "0": False, "yes": True, "no": False}
     for bcol in ["promotion_applied", "holiday_indicator", "stockout_indicator"]:
-        if bcol in df.columns:
-            if df[bcol].dtype == object:
-                df[bcol] = df[bcol].astype(str).str.strip().str.lower().map(
-                    {"true": True, "false": False, "1": True, "0": False, "yes": True, "no": False}
-                ).fillna(df[bcol])
+        if bcol in df.columns and df[bcol].dtype == object:
+            df[bcol] = (
+                df[bcol].astype(str).str.strip().str.lower()
+                .map(bool_map)
+                .where(df[bcol].notna(), df[bcol])
+            )
+
+    # Garante strings
+    for s in ["category", "store_location", "payment_method", "loyalty_level", "product_name"]:
+        if s in df.columns:
+            df[s] = df[s].astype(str)
+
     return df
+
+
+def _fmt_money(x: float) -> str:
+    try:
+        return f"{x:,.2f}"
+    except Exception:
+        return str(x)
+
+
+def _fmt_int(x: float) -> str:
+    try:
+        return f"{int(x):,}"
+    except Exception:
+        return str(x)
+
+
+def _fmt_pct(x: float | None) -> str:
+    if x is None or pd.isna(x):
+        return "—"
+    return f"{x:.1f}%"
 
 
 def create_app() -> Flask:
     app = Flask(__name__)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
-    # ✅ Inject current year into all templates (base.html footer)
     @app.context_processor
     def inject_current_year():
         return {"current_year": datetime.now().year}
@@ -153,7 +193,6 @@ def create_app() -> Flask:
 
     _configure_logging(app)
 
-    # Service com acesso ao DATA_DIR (Ames)
     service = PortfolioService(timeout=30, data_dir=app.config["DATA_DIR"])
 
     @app.after_request
@@ -200,193 +239,235 @@ def create_app() -> Flask:
     def index():
         return safe_render("index.html")
 
-    # =========================
-    # SALES (WALMART)
-    # =========================
+    # ======================================================
+    # SALES DASHBOARD (WALMART)  ✅ compatível com seu sales.html
+    # ======================================================
     @app.route("/sales", methods=["GET"])
     def sales_dashboard():
-        """
-        Dashboard de BI com filtros via querystring:
-          - start=YYYY-MM-DD
-          - end=YYYY-MM-DD
-          - category=...
-          - store=...
-          - promo=true/false/all
-        """
-        df = _load_walmart_sales_csv(DATA_DIR)
+        warning = None
+        try:
+            df_all = _load_walmart_csv(DATA_DIR)
+        except Exception as e:
+            warning = str(e)
+            df_all = pd.DataFrame()
 
-        # Filtros (GET)
-        start = (request.args.get("start") or "").strip()
-        end = (request.args.get("end") or "").strip()
-        category = (request.args.get("category") or "").strip()
-        store = (request.args.get("store") or "").strip()
-        promo = (request.args.get("promo") or "all").strip().lower()
+        # -------- Options (dropdowns) --------
+        options = {
+            "categories": sorted(df_all["category"].dropna().astype(str).unique().tolist()) if "category" in df_all.columns else [],
+            "stores": sorted(df_all["store_location"].dropna().astype(str).unique().tolist()) if "store_location" in df_all.columns else [],
+            "loyalty_levels": sorted(df_all["loyalty_level"].dropna().astype(str).unique().tolist()) if "loyalty_level" in df_all.columns else [],
+            "payment_methods": sorted(df_all["payment_method"].dropna().astype(str).unique().tolist()) if "payment_method" in df_all.columns else [],
+        }
 
-        df_f = df.copy()
+        # -------- Filters (GET params) --------
+        date_start = (request.args.get("date_start") or "").strip()
+        date_end = (request.args.get("date_end") or "").strip()
+        category = (request.args.get("category") or "All").strip()
+        store_location = (request.args.get("store_location") or "All").strip()
+        promotion_applied = (request.args.get("promotion_applied") or "All").strip()
+        loyalty = (request.args.get("loyalty") or "All").strip()
+        payment_method = (request.args.get("payment_method") or "All").strip()
 
-        # date range
-        if "transaction_date" in df_f.columns:
-            if start:
-                dt_start = pd.to_datetime(start, errors="coerce")
-                if pd.notna(dt_start):
-                    df_f = df_f[df_f["transaction_date"] >= dt_start]
-            if end:
-                dt_end = pd.to_datetime(end, errors="coerce")
-                if pd.notna(dt_end):
-                    # inclui o dia inteiro
-                    df_f = df_f[df_f["transaction_date"] < (dt_end + pd.Timedelta(days=1))]
+        filters = {
+            "date_start": date_start or None,
+            "date_end": date_end or None,
+            "category": category if category != "" else "All",
+            "store_location": store_location if store_location != "" else "All",
+            "promotion_applied": promotion_applied if promotion_applied != "" else "All",
+            "loyalty": loyalty if loyalty != "" else "All",
+            "payment_method": payment_method if payment_method != "" else "All",
+        }
 
-        # category
-        if category and "category" in df_f.columns:
-            df_f = df_f[df_f["category"].astype(str) == category]
+        df = df_all.copy()
 
-        # store
-        if store and "store_location" in df_f.columns:
-            df_f = df_f[df_f["store_location"].astype(str) == store]
+        # -------- Apply filters --------
+        if "transaction_date" in df.columns:
+            if date_start:
+                dt = pd.to_datetime(date_start, errors="coerce")
+                if pd.notna(dt):
+                    df = df[df["transaction_date"] >= dt]
+            if date_end:
+                dt = pd.to_datetime(date_end, errors="coerce")
+                if pd.notna(dt):
+                    df = df[df["transaction_date"] < (dt + pd.Timedelta(days=1))]
 
-        # promo
-        if promo in {"true", "false"} and "promotion_applied" in df_f.columns:
-            df_f = df_f[df_f["promotion_applied"] == (promo == "true")]
+        if category != "All" and "category" in df.columns:
+            df = df[df["category"].astype(str) == category]
 
-        # Listas para dropdowns (sem depender do filtro atual)
-        categories = sorted(df["category"].dropna().astype(str).unique().tolist()) if "category" in df.columns else []
-        stores = sorted(df["store_location"].dropna().astype(str).unique().tolist()) if "store_location" in df.columns else []
+        if store_location != "All" and "store_location" in df.columns:
+            df = df[df["store_location"].astype(str) == store_location]
 
-        # KPIs
-        total_revenue = float(df_f["revenue"].sum()) if "revenue" in df_f.columns else 0.0
-        total_units = int(pd.to_numeric(df_f.get("quantity_sold"), errors="coerce").fillna(0).sum()) if "quantity_sold" in df_f.columns else 0
-        orders = int(df_f["transaction_id"].nunique()) if "transaction_id" in df_f.columns else int(len(df_f))
-        customers = int(df_f["customer_id"].nunique()) if "customer_id" in df_f.columns else 0
-        aov = float(total_revenue / orders) if orders > 0 else 0.0
+        if promotion_applied in {"true", "false"} and "promotion_applied" in df.columns:
+            df = df[df["promotion_applied"] == (promotion_applied == "true")]
+
+        if loyalty != "All" and "loyalty_level" in df.columns:
+            df = df[df["loyalty_level"].astype(str) == loyalty]
+
+        if payment_method != "All" and "payment_method" in df.columns:
+            df = df[df["payment_method"].astype(str) == payment_method]
+
+        if df.empty:
+            warning = warning or "No rows for the selected filters."
+
+        # -------- Meta (top chips) --------
+        date_min = None
+        date_max = None
+        if "transaction_date" in df_all.columns and df_all["transaction_date"].notna().any():
+            date_min = df_all["transaction_date"].min()
+            date_max = df_all["transaction_date"].max()
+
+        meta = {
+            "n_rows": int(len(df_all)) if not df_all.empty else 0,
+            "date_min": date_min.strftime("%Y-%m-%d") if isinstance(date_min, pd.Timestamp) else "—",
+            "date_max": date_max.strftime("%Y-%m-%d") if isinstance(date_max, pd.Timestamp) else "—",
+            "n_stores": int(df_all["store_location"].nunique()) if "store_location" in df_all.columns else 0,
+            "n_categories": int(df_all["category"].nunique()) if "category" in df_all.columns else 0,
+        }
+
+        # -------- KPIs --------
+        revenue = float(df["revenue"].sum()) if "revenue" in df.columns else 0.0
+        transactions = int(df["transaction_id"].nunique()) if "transaction_id" in df.columns else int(len(df))
+        units = float(df["quantity_sold"].sum()) if "quantity_sold" in df.columns else 0.0
+        aov = (revenue / transactions) if transactions > 0 else 0.0
 
         promo_share = None
-        if "promotion_applied" in df_f.columns and len(df_f) > 0:
-            promo_share = float(df_f["promotion_applied"].mean() * 100.0)
+        if "promotion_applied" in df.columns and len(df) > 0:
+            promo_share = float(df["promotion_applied"].mean() * 100.0)
 
         stockout_rate = None
-        if "stockout_indicator" in df_f.columns and len(df_f) > 0:
-            stockout_rate = float(df_f["stockout_indicator"].mean() * 100.0)
+        if "stockout_indicator" in df.columns and len(df) > 0:
+            stockout_rate = float(df["stockout_indicator"].mean() * 100.0)
 
-        # ================
-        # Charts (Plotly)
-        # ================
-        graph_rev_ts_json = None
-        if "transaction_date" in df_f.columns and "revenue" in df_f.columns:
-            ts = (
-                df_f.dropna(subset=["transaction_date"])
-                .assign(day=lambda x: x["transaction_date"].dt.date)
-                .groupby("day", as_index=False)["revenue"].sum()
-                .sort_values("day")
-            )
-            if len(ts) > 0:
-                fig = px.line(ts, x="day", y="revenue", title="Revenue over time (daily)")
-                fig.update_layout(margin=dict(l=10, r=10, t=50, b=10))
-                graph_rev_ts_json = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+        avg_unit_price = float(df["unit_price"].mean()) if "unit_price" in df.columns and len(df) > 0 else None
 
-        graph_cat_json = None
-        if "category" in df_f.columns and "revenue" in df_f.columns:
-            cat = (
-                df_f.groupby("category", as_index=False)["revenue"].sum()
-                .sort_values("revenue", ascending=False)
-            )
-            if len(cat) > 0:
-                fig = px.bar(cat, x="category", y="revenue", title="Revenue by category")
-                fig.update_layout(margin=dict(l=10, r=10, t=50, b=10), xaxis_tickangle=-20)
-                graph_cat_json = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
-
-        graph_store_json = None
-        if "store_location" in df_f.columns and "revenue" in df_f.columns:
-            st = (
-                df_f.groupby("store_location", as_index=False)["revenue"].sum()
-                .sort_values("revenue", ascending=False)
-                .head(15)
-            )
-            if len(st) > 0:
-                fig = px.bar(st, x="store_location", y="revenue", title="Top stores by revenue (Top 15)")
-                fig.update_layout(margin=dict(l=10, r=10, t=50, b=10), xaxis_tickangle=-25)
-                graph_store_json = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
-
-        graph_pay_json = None
-        if "payment_method" in df_f.columns and "revenue" in df_f.columns:
-            pm = (
-                df_f.groupby("payment_method", as_index=False)["revenue"].sum()
-                .sort_values("revenue", ascending=False)
-            )
-            if len(pm) > 0:
-                fig = px.pie(pm, names="payment_method", values="revenue", title="Revenue share by payment method")
-                fig.update_layout(margin=dict(l=10, r=10, t=50, b=10))
-                graph_pay_json = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
-
-        graph_demand_json = None
-        if {"forecasted_demand", "actual_demand"}.issubset(df_f.columns):
-            dd = df_f[["forecasted_demand", "actual_demand"]].dropna()
+        # MAPE (forecast vs actual demand)
+        mape_val = None
+        if {"forecasted_demand", "actual_demand"}.issubset(df.columns):
+            dd = df[["forecasted_demand", "actual_demand"]].dropna()
             if len(dd) > 0:
-                fig = px.scatter(
-                    dd,
-                    x="forecasted_demand",
-                    y="actual_demand",
-                    title="Forecasted vs Actual demand",
-                    trendline="ols" if len(dd) >= 30 else None,
-                )
-                fig.update_layout(margin=dict(l=10, r=10, t=50, b=10))
-                graph_demand_json = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+                denom = dd["actual_demand"].abs().clip(lower=1e-8)
+                mape_val = float(((dd["forecasted_demand"] - dd["actual_demand"]).abs() / denom).mean() * 100.0)
 
-        # Top products table
-        top_products = []
-        if {"product_name", "revenue"}.issubset(df_f.columns):
+        kpis = {
+            "revenue": _fmt_money(revenue),
+            "transactions": _fmt_int(transactions),
+            "units": _fmt_int(units),
+            "aov": _fmt_money(aov),
+            "promo_share": _fmt_pct(promo_share),
+            "stockout_rate": _fmt_pct(stockout_rate),
+            "mape": _fmt_pct(mape_val),
+            "avg_unit_price": _fmt_money(avg_unit_price) if avg_unit_price is not None else "—",
+        }
+
+        # -------- Charts --------
+        # Revenue trend (monthly)
+        if not df.empty and "transaction_date" in df.columns and "revenue" in df.columns:
+            tmp = df.dropna(subset=["transaction_date"]).copy()
+            tmp["month"] = tmp["transaction_date"].dt.to_period("M").dt.to_timestamp()
+            ts = tmp.groupby("month", as_index=False)["revenue"].sum().sort_values("month")
+            fig_rev_trend = px.line(ts, x="month", y="revenue", title="Revenue trend (monthly)")
+            fig_rev_trend.update_layout(margin=dict(l=10, r=10, t=50, b=10))
+        else:
+            fig_rev_trend = _empty_fig("Revenue trend (monthly)")
+
+        # Revenue by category
+        if not df.empty and "category" in df.columns and "revenue" in df.columns:
+            cat = df.groupby("category", as_index=False)["revenue"].sum().sort_values("revenue", ascending=False)
+            fig_rev_cat = px.bar(cat, x="category", y="revenue", title="Revenue by category")
+            fig_rev_cat.update_layout(margin=dict(l=10, r=10, t=50, b=10), xaxis_tickangle=-20)
+        else:
+            fig_rev_cat = _empty_fig("Revenue by category")
+
+        # Top products (bar)
+        if not df.empty and {"product_name", "revenue"}.issubset(df.columns):
             tp = (
-                df_f.groupby("product_name", as_index=False)["revenue"].sum()
-                .sort_values("revenue", ascending=False)
-                .head(10)
+                df.groupby("product_name", as_index=False)["revenue"].sum()
+                .sort_values("revenue", ascending=False).head(12)
             )
-            top_products = tp.to_dict(orient="records")
+            fig_top_products = px.bar(tp, x="product_name", y="revenue", title="Top products (revenue)")
+            fig_top_products.update_layout(margin=dict(l=10, r=10, t=50, b=10), xaxis_tickangle=-25)
+        else:
+            fig_top_products = _empty_fig("Top products (revenue)")
 
-        # Preview table (últimas 15 transações)
-        preview_rows = []
-        preview_cols = []
-        if len(df_f) > 0:
-            cols = [c for c in ["transaction_date", "store_location", "category", "product_name", "quantity_sold", "unit_price", "revenue", "promotion_applied"] if c in df_f.columns]
-            preview_cols = cols
-            prev = df_f.sort_values("transaction_date" if "transaction_date" in df_f.columns else df_f.index, ascending=False).head(15)
-            prev = prev[cols].copy() if cols else prev.head(15)
-            # serialização simples
-            if "transaction_date" in prev.columns:
-                prev["transaction_date"] = prev["transaction_date"].dt.strftime("%Y-%m-%d %H:%M")
-            preview_rows = prev.to_dict(orient="records")
+        # Top stores
+        if not df.empty and {"store_location", "revenue"}.issubset(df.columns):
+            st = (
+                df.groupby("store_location", as_index=False)["revenue"].sum()
+                .sort_values("revenue", ascending=False).head(15)
+            )
+            fig_top_stores = px.bar(st, x="store_location", y="revenue", title="Top stores by revenue")
+            fig_top_stores.update_layout(margin=dict(l=10, r=10, t=50, b=10), xaxis_tickangle=-25)
+        else:
+            fig_top_stores = _empty_fig("Top stores by revenue")
 
-        ctx = dict(
-            # filtros
-            start=start,
-            end=end,
-            category=category,
-            store=store,
-            promo=promo,
-            categories=categories,
-            stores=stores,
+        # Payment mix (pie)
+        if not df.empty and {"payment_method", "revenue"}.issubset(df.columns):
+            pm = df.groupby("payment_method", as_index=False)["revenue"].sum().sort_values("revenue", ascending=False)
+            fig_payment = px.pie(pm, names="payment_method", values="revenue", title="Payment mix (revenue)")
+            fig_payment.update_layout(margin=dict(l=10, r=10, t=50, b=10))
+        else:
+            fig_payment = _empty_fig("Payment mix (revenue)")
 
-            # kpis
-            total_revenue=total_revenue,
-            total_units=total_units,
-            orders=orders,
-            customers=customers,
-            aov=aov,
-            promo_share=promo_share,
-            stockout_rate=stockout_rate,
+        # Forecast vs actual scatter
+        if not df.empty and {"forecasted_demand", "actual_demand"}.issubset(df.columns):
+            dd = df[["forecasted_demand", "actual_demand"]].dropna()
+            fig_fc = px.scatter(dd, x="forecasted_demand", y="actual_demand", title="Forecast vs actual demand")
+            fig_fc.update_layout(margin=dict(l=10, r=10, t=50, b=10))
+        else:
+            fig_fc = _empty_fig("Forecast vs actual demand")
 
-            # charts
-            graph_rev_ts_json=graph_rev_ts_json,
-            graph_cat_json=graph_cat_json,
-            graph_store_json=graph_store_json,
-            graph_pay_json=graph_pay_json,
-            graph_demand_json=graph_demand_json,
+        charts = {
+            "rev_trend_json": json.dumps(fig_rev_trend, cls=plotly.utils.PlotlyJSONEncoder),
+            "rev_category_json": json.dumps(fig_rev_cat, cls=plotly.utils.PlotlyJSONEncoder),
+            "top_products_json": json.dumps(fig_top_products, cls=plotly.utils.PlotlyJSONEncoder),
+            "top_stores_json": json.dumps(fig_top_stores, cls=plotly.utils.PlotlyJSONEncoder),
+            "payment_mix_json": json.dumps(fig_payment, cls=plotly.utils.PlotlyJSONEncoder),
+            "forecast_scatter_json": json.dumps(fig_fc, cls=plotly.utils.PlotlyJSONEncoder),
+        }
 
-            # tables
-            top_products=top_products,
-            preview_cols=preview_cols,
-            preview_rows=preview_rows,
+        # -------- Table preview (table.columns + table.rows) --------
+        preview_cols = [c for c in [
+            "transaction_date", "store_location", "category", "product_name",
+            "quantity_sold", "unit_price", "revenue", "promotion_applied",
+            "loyalty_level", "payment_method", "stockout_indicator"
+        ] if c in df.columns]
+
+        df_prev = df.copy()
+        if "transaction_date" in df_prev.columns:
+            df_prev = df_prev.sort_values("transaction_date", ascending=False)
+
+        df_prev = df_prev[preview_cols].head(15) if preview_cols else df_prev.head(15)
+
+        # serializa cells (principalmente datas)
+        rows = []
+        if not df_prev.empty:
+            for _, r in df_prev.iterrows():
+                row = []
+                for c in df_prev.columns:
+                    v = r[c]
+                    if isinstance(v, pd.Timestamp):
+                        row.append(v.strftime("%Y-%m-%d %H:%M"))
+                    elif pd.isna(v):
+                        row.append("")
+                    else:
+                        row.append(v)
+                rows.append(row)
+
+        table = {
+            "columns": list(df_prev.columns),
+            "rows": rows,
+        }
+
+        return safe_render(
+            "sales.html",
+            meta=meta,
+            filters=filters,
+            options=options,
+            kpis=kpis,
+            charts=charts,
+            table=table,
+            warning=warning,
         )
-
-        return safe_render("sales.html", **ctx)
 
     # =========================
     # AMES
@@ -442,20 +523,12 @@ def create_app() -> Flask:
         color_col = "price_range_en" if "price_range_en" in df_plot.columns else None
 
         fig_hist = px.histogram(
-            df_plot,
-            x=var,
-            nbins=40,
-            marginal="box",
-            title=f"Distribution of {label}",
-            labels={var: label},
+            df_plot, x=var, nbins=40, marginal="box",
+            title=f"Distribution of {label}", labels={var: label},
         )
-
         fig_box = px.box(
-            df_plot,
-            y=var,
-            points="outliers",
-            title=f"Boxplot of {label}",
-            labels={var: label},
+            df_plot, y=var, points="outliers",
+            title=f"Boxplot of {label}", labels={var: label},
         )
 
         graph_hist_json = json.dumps(fig_hist, cls=plotly.utils.PlotlyJSONEncoder)
@@ -464,25 +537,16 @@ def create_app() -> Flask:
         graph_scatter_json = None
         if "preco" in df_plot.columns and var in df_plot.columns and var != "preco":
             fig_scatter = px.scatter(
-                df_plot,
-                x=var,
-                y="preco",
-                color=color_col,
+                df_plot, x=var, y="preco", color=color_col,
                 title=f"Price vs {label}",
-                labels={
-                    var: label,
-                    "preco": "Price (€)",
-                    "price_range_en": "Price range",
-                },
+                labels={var: label, "preco": "Price (€)", "price_range_en": "Price range"},
             )
             graph_scatter_json = json.dumps(fig_scatter, cls=plotly.utils.PlotlyJSONEncoder)
 
         graph_box_faixa_json = None
         if "price_range_en" in df_plot.columns:
             fig_box_faixa = px.box(
-                df_plot,
-                x="price_range_en",
-                y=var,
+                df_plot, x="price_range_en", y=var,
                 title=f"{label} by price range",
                 labels={"price_range_en": "Price range", var: label},
             )
@@ -491,16 +555,9 @@ def create_app() -> Flask:
         graph_preco_ano_json = None
         if "preco" in df_plot.columns and "ano_construcao" in df_plot.columns:
             fig_preco_ano = px.scatter(
-                df_plot,
-                x="ano_construcao",
-                y="preco",
-                color=color_col,
+                df_plot, x="ano_construcao", y="preco", color=color_col,
                 title="Price vs Year Built",
-                labels={
-                    "ano_construcao": "Year Built",
-                    "preco": "Price (€)",
-                    "price_range_en": "Price range",
-                },
+                labels={"ano_construcao": "Year Built", "preco": "Price (€)", "price_range_en": "Price range"},
             )
             graph_preco_ano_json = json.dumps(fig_preco_ano, cls=plotly.utils.PlotlyJSONEncoder)
 
@@ -508,12 +565,7 @@ def create_app() -> Flask:
         corr_cols = [c for c in ["preco", "preco_m2", "area_habitavel", "area_total", "quartos", "banheiros"] if c in df_plot.columns]
         if len(corr_cols) >= 2:
             corr = df_plot[corr_cols].corr(numeric_only=True)
-            fig_heat = px.imshow(
-                corr,
-                text_auto=True,
-                aspect="auto",
-                title="Correlation matrix (Pearson)",
-            )
+            fig_heat = px.imshow(corr, text_auto=True, aspect="auto", title="Correlation matrix (Pearson)")
             graph_heatmap_json = json.dumps(fig_heat, cls=plotly.utils.PlotlyJSONEncoder)
 
         graph_map_json = None
@@ -522,47 +574,30 @@ def create_app() -> Flask:
             MAX_PONTOS = 2000
             if len(df_map) > MAX_PONTOS:
                 df_map = df_map.sample(MAX_PONTOS, random_state=42)
-
             if len(df_map) > 0:
                 fig_map = px.scatter_mapbox(
-                    df_map,
-                    lat="latitude",
-                    lon="longitude",
-                    color=color_col,
-                    zoom=9,
-                    height=550,
+                    df_map, lat="latitude", lon="longitude", color=color_col,
+                    zoom=9, height=550,
                     title=f"Properties map (sample up to {MAX_PONTOS} properties)",
                     labels={"price_range_en": "Price range"},
                 )
-                fig_map.update_layout(
-                    mapbox_style="open-street-map",
-                    margin=dict(l=0, r=0, t=40, b=0)
-                )
+                fig_map.update_layout(mapbox_style="open-street-map", margin=dict(l=0, r=0, t=40, b=0))
                 fig_map.update_traces(marker=dict(size=6, opacity=0.6))
                 graph_map_json = json.dumps(fig_map, cls=plotly.utils.PlotlyJSONEncoder)
 
         graph_box_bairro_json = None
         graph_bar_bairro_json = None
         bairro_col = "bairro" if "bairro" in df_plot.columns else ("Neighborhood" if "Neighborhood" in df_plot.columns else None)
-
         if bairro_col and "preco" in df_plot.columns:
             top = (
-                df_plot[[bairro_col, "preco"]]
-                .dropna()
-                .groupby(bairro_col)["preco"]
-                .mean()
-                .sort_values(ascending=False)
-                .head(20)
-                .index
-                .tolist()
+                df_plot[[bairro_col, "preco"]].dropna()
+                .groupby(bairro_col)["preco"].mean()
+                .sort_values(ascending=False).head(20).index.tolist()
             )
             df_bairro = df_plot[df_plot[bairro_col].isin(top)].copy()
-
             if len(df_bairro) > 0:
                 fig_box_bairro = px.box(
-                    df_bairro,
-                    x=bairro_col,
-                    y="preco",
+                    df_bairro, x=bairro_col, y="preco",
                     title="Price distribution by neighborhood (Top 20)",
                     labels={bairro_col: "Neighborhood", "preco": "Price (€)"},
                 )
@@ -571,8 +606,7 @@ def create_app() -> Flask:
 
                 fig_bar_bairro = px.bar(
                     df_bairro.groupby(bairro_col, as_index=False)["preco"].mean().sort_values("preco", ascending=False),
-                    x=bairro_col,
-                    y="preco",
+                    x=bairro_col, y="preco",
                     title="Average price by neighborhood (Top 20)",
                     labels={bairro_col: "Neighborhood", "preco": "Average price (€)"},
                 )
