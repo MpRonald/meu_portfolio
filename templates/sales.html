@@ -2,7 +2,6 @@
 {% block title %}Sales Dashboard · Walmart{% endblock %}
 {% block content %}
 
-<!-- Plotly (only this page needs it) -->
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 
 <div class="container-xl sales-page" style="max-width: 1200px;">
@@ -12,10 +11,10 @@
     <div class="sales-hero-inner">
       <div>
         <div class="sales-kicker">BI DASHBOARD · WALMART SALES</div>
-        <h1 class="sales-h1">Sales Performance & Customer Insights</h1>
+        <h1 class="sales-h1">Sales Performance & Store Comparison</h1>
         <p class="sales-subtitle">
-          Explore revenue, units sold, promotions, stockouts, demand forecasting accuracy and customer segments.
-          Use filters to drill down by category, store, date range, promotions and loyalty level.
+          Explore revenue, units sold, promotions, stockouts, demand forecast accuracy and product mix.
+          Use filters to drill down — and compare two stores to see who sells more and what drives performance.
         </p>
       </div>
 
@@ -37,7 +36,7 @@
         <div>
           <h2 class="sales-h2 mb-1">Filters</h2>
           <p class="text-muted mb-0 small">
-            Tip: keep “All” to see the global view. Narrow the scope to compare performance across dimensions.
+            Tip: Keep “All” for global view. Use Store A/B to compare two locations.
           </p>
         </div>
         <div class="sales-badge-row">
@@ -50,7 +49,6 @@
 
       <form method="get" class="row g-3">
 
-        <!-- Date range -->
         <div class="col-md-3">
           <label class="form-label sales-label" for="date_start">Start date</label>
           <input type="date" class="form-control" id="date_start" name="date_start"
@@ -65,7 +63,6 @@
           <div class="form-text">Optional</div>
         </div>
 
-        <!-- Category -->
         <div class="col-md-3">
           <label class="form-label sales-label" for="category">Category</label>
           <select class="form-select" id="category" name="category">
@@ -76,18 +73,47 @@
           </select>
         </div>
 
-        <!-- Store -->
         <div class="col-md-3">
-          <label class="form-label sales-label" for="store_location">Store</label>
+          <label class="form-label sales-label" for="product_name">Product</label>
+          <select class="form-select" id="product_name" name="product_name">
+            <option value="All" {% if (filters.product_name or 'All') == 'All' %}selected{% endif %}>All</option>
+            {% for p in options.products %}
+              <option value="{{ p }}" {% if filters.product_name == p %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label sales-label" for="store_location">Store (single)</label>
           <select class="form-select" id="store_location" name="store_location">
             <option value="All" {% if (filters.store_location or 'All') == 'All' %}selected{% endif %}>All</option>
             {% for s in options.stores %}
               <option value="{{ s }}" {% if filters.store_location == s %}selected{% endif %}>{{ s }}</option>
             {% endfor %}
           </select>
+          <div class="form-text">Use All when comparing A vs B</div>
         </div>
 
-        <!-- Promotion -->
+        <div class="col-md-3">
+          <label class="form-label sales-label" for="store_a">Compare · Store A</label>
+          <select class="form-select" id="store_a" name="store_a">
+            <option value="None" {% if (filters.store_a or 'None') == 'None' %}selected{% endif %}>None</option>
+            {% for s in options.stores %}
+              <option value="{{ s }}" {% if filters.store_a == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label sales-label" for="store_b">Compare · Store B</label>
+          <select class="form-select" id="store_b" name="store_b">
+            <option value="None" {% if (filters.store_b or 'None') == 'None' %}selected{% endif %}>None</option>
+            {% for s in options.stores %}
+              <option value="{{ s }}" {% if filters.store_b == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
         <div class="col-md-3">
           <label class="form-label sales-label" for="promotion_applied">Promotion applied</label>
           <select class="form-select" id="promotion_applied" name="promotion_applied">
@@ -97,7 +123,6 @@
           </select>
         </div>
 
-        <!-- Loyalty -->
         <div class="col-md-3">
           <label class="form-label sales-label" for="loyalty">Loyalty level</label>
           <select class="form-select" id="loyalty" name="loyalty">
@@ -108,7 +133,6 @@
           </select>
         </div>
 
-        <!-- Payment -->
         <div class="col-md-3">
           <label class="form-label sales-label" for="payment_method">Payment method</label>
           <select class="form-select" id="payment_method" name="payment_method">
@@ -119,7 +143,6 @@
           </select>
         </div>
 
-        <!-- Actions -->
         <div class="col-md-3 d-flex align-items-end justify-content-start gap-2">
           <button type="submit" class="btn btn-primary">Apply</button>
           <a class="btn btn-secondary" href="{{ url_for('sales_dashboard') }}">Reset</a>
@@ -137,70 +160,105 @@
 
   <!-- KPI GRID -->
   <section class="sales-kpi-grid mb-4 fade-in-up">
-    <div class="card sales-kpi">
-      <div class="card-body">
-        <div class="sales-kpi-label">Revenue</div>
-        <div class="sales-kpi-value sales-mono">{{ kpis.revenue }}</div>
-        <div class="text-muted small sales-kpi-foot">Total revenue in selected scope</div>
-      </div>
-    </div>
+    <div class="card sales-kpi"><div class="card-body">
+      <div class="sales-kpi-label">Revenue</div>
+      <div class="sales-kpi-value sales-mono">{{ kpis.revenue }}</div>
+      <div class="text-muted small sales-kpi-foot">Total revenue</div>
+    </div></div>
 
-    <div class="card sales-kpi">
-      <div class="card-body">
-        <div class="sales-kpi-label">Transactions</div>
-        <div class="sales-kpi-value sales-mono">{{ kpis.transactions }}</div>
-        <div class="text-muted small sales-kpi-foot">Count of orders/rows</div>
-      </div>
-    </div>
+    <div class="card sales-kpi"><div class="card-body">
+      <div class="sales-kpi-label">Transactions</div>
+      <div class="sales-kpi-value sales-mono">{{ kpis.transactions }}</div>
+      <div class="text-muted small sales-kpi-foot">Rows in scope</div>
+    </div></div>
 
-    <div class="card sales-kpi">
-      <div class="card-body">
-        <div class="sales-kpi-label">Units sold</div>
-        <div class="sales-kpi-value sales-mono">{{ kpis.units }}</div>
-        <div class="text-muted small sales-kpi-foot">Total quantity sold</div>
-      </div>
-    </div>
+    <div class="card sales-kpi"><div class="card-body">
+      <div class="sales-kpi-label">Units sold</div>
+      <div class="sales-kpi-value sales-mono">{{ kpis.units }}</div>
+      <div class="text-muted small sales-kpi-foot">Total quantity</div>
+    </div></div>
 
-    <div class="card sales-kpi">
-      <div class="card-body">
-        <div class="sales-kpi-label">Avg order value</div>
-        <div class="sales-kpi-value sales-mono">{{ kpis.aov }}</div>
-        <div class="text-muted small sales-kpi-foot">Revenue / transactions</div>
-      </div>
-    </div>
+    <div class="card sales-kpi"><div class="card-body">
+      <div class="sales-kpi-label">Avg order value</div>
+      <div class="sales-kpi-value sales-mono">{{ kpis.aov }}</div>
+      <div class="text-muted small sales-kpi-foot">Revenue / transactions</div>
+    </div></div>
 
-    <div class="card sales-kpi">
-      <div class="card-body">
-        <div class="sales-kpi-label">Promo share</div>
-        <div class="sales-kpi-value sales-mono">{{ kpis.promo_share }}</div>
-        <div class="text-muted small sales-kpi-foot">Orders with promotion</div>
-      </div>
-    </div>
+    <div class="card sales-kpi"><div class="card-body">
+      <div class="sales-kpi-label">Promo share</div>
+      <div class="sales-kpi-value sales-mono">{{ kpis.promo_share }}</div>
+      <div class="text-muted small sales-kpi-foot">Orders with promotion</div>
+    </div></div>
 
-    <div class="card sales-kpi">
-      <div class="card-body">
-        <div class="sales-kpi-label">Stockout rate</div>
-        <div class="sales-kpi-value sales-mono">{{ kpis.stockout_rate }}</div>
-        <div class="text-muted small sales-kpi-foot">Supply risk indicator</div>
-      </div>
-    </div>
+    <div class="card sales-kpi"><div class="card-body">
+      <div class="sales-kpi-label">Stockout rate</div>
+      <div class="sales-kpi-value sales-mono">{{ kpis.stockout_rate }}</div>
+      <div class="text-muted small sales-kpi-foot">Supply risk</div>
+    </div></div>
 
-    <div class="card sales-kpi">
-      <div class="card-body">
-        <div class="sales-kpi-label">Forecast MAPE</div>
-        <div class="sales-kpi-value sales-mono">{{ kpis.mape }}</div>
-        <div class="text-muted small sales-kpi-foot">Demand forecast accuracy</div>
-      </div>
-    </div>
+    <div class="card sales-kpi"><div class="card-body">
+      <div class="sales-kpi-label">Forecast MAPE</div>
+      <div class="sales-kpi-value sales-mono">{{ kpis.mape }}</div>
+      <div class="text-muted small sales-kpi-foot">Forecast accuracy</div>
+    </div></div>
 
-    <div class="card sales-kpi">
-      <div class="card-body">
-        <div class="sales-kpi-label">Avg unit price</div>
-        <div class="sales-kpi-value sales-mono">{{ kpis.avg_unit_price }}</div>
-        <div class="text-muted small sales-kpi-foot">Mean price across items</div>
+    <div class="card sales-kpi"><div class="card-body">
+      <div class="sales-kpi-label">Avg unit price</div>
+      <div class="sales-kpi-value sales-mono">{{ kpis.avg_unit_price }}</div>
+      <div class="text-muted small sales-kpi-foot">Mean price</div>
+    </div></div>
+  </section>
+
+  <!-- COMPARISON SECTION -->
+  {% if compare %}
+  <section class="card sales-card mb-4 fade-in-up">
+    <div class="card-body">
+      <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
+        <div>
+          <h3 class="sales-h3 mb-1">Store comparison</h3>
+          <p class="text-muted small mb-0">
+            Comparing <strong>{{ compare.store_a }}</strong> vs <strong>{{ compare.store_b }}</strong>
+          </p>
+        </div>
+        <span class="badge sales-badge sales-badge-primary">A vs B</span>
       </div>
+
+      <hr class="sales-hr">
+
+      <div class="sales-compare-grid">
+        <div class="sales-compare-card">
+          <div class="sales-compare-title">{{ compare.store_a }}</div>
+          <div class="sales-compare-kpi"><span>Revenue</span><strong class="sales-mono">{{ compare.kpi_a.revenue }}</strong></div>
+          <div class="sales-compare-kpi"><span>Units</span><strong class="sales-mono">{{ compare.kpi_a.units }}</strong></div>
+          <div class="sales-compare-kpi"><span>Transactions</span><strong class="sales-mono">{{ compare.kpi_a.transactions }}</strong></div>
+          <div class="sales-compare-kpi"><span>AOV</span><strong class="sales-mono">{{ compare.kpi_a.aov }}</strong></div>
+        </div>
+
+        <div class="sales-compare-card">
+          <div class="sales-compare-title">{{ compare.store_b }}</div>
+          <div class="sales-compare-kpi"><span>Revenue</span><strong class="sales-mono">{{ compare.kpi_b.revenue }}</strong></div>
+          <div class="sales-compare-kpi"><span>Units</span><strong class="sales-mono">{{ compare.kpi_b.units }}</strong></div>
+          <div class="sales-compare-kpi"><span>Transactions</span><strong class="sales-mono">{{ compare.kpi_b.transactions }}</strong></div>
+          <div class="sales-compare-kpi"><span>AOV</span><strong class="sales-mono">{{ compare.kpi_b.aov }}</strong></div>
+        </div>
+      </div>
+
+      <div class="row g-4 mt-2">
+        <div class="col-lg-6">
+          <div class="sales-chart">
+            <div id="sales_cmp_trend" class="sales-plot"></div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="sales-chart">
+            <div id="sales_cmp_category" class="sales-plot"></div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </section>
+  {% endif %}
 
   <!-- CHARTS -->
   <section class="row g-4 mb-4 fade-in-up">
@@ -208,13 +266,8 @@
     <div class="col-lg-8">
       <div class="card sales-card">
         <div class="card-body">
-          <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
-            <div>
-              <h3 class="sales-h3 mb-1">Revenue trend</h3>
-              <p class="text-muted small mb-0">Monthly revenue evolution (selected scope)</p>
-            </div>
-            <span class="badge sales-badge sales-badge-neutral">Time series</span>
-          </div>
+          <h3 class="sales-h3 mb-1">Revenue trend</h3>
+          <p class="text-muted small mb-0">Monthly revenue evolution (selected scope)</p>
           <div class="sales-chart mt-3">
             <div id="sales_rev_trend" class="sales-plot"></div>
           </div>
@@ -225,13 +278,8 @@
     <div class="col-lg-4">
       <div class="card sales-card">
         <div class="card-body">
-          <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
-            <div>
-              <h3 class="sales-h3 mb-1">Revenue by category</h3>
-              <p class="text-muted small mb-0">Contribution per category</p>
-            </div>
-            <span class="badge sales-badge sales-badge-primary">Core</span>
-          </div>
+          <h3 class="sales-h3 mb-1">Revenue by category</h3>
+          <p class="text-muted small mb-0">Contribution per category</p>
           <div class="sales-chart mt-3">
             <div id="sales_rev_category" class="sales-plot"></div>
           </div>
@@ -242,13 +290,8 @@
     <div class="col-lg-6">
       <div class="card sales-card">
         <div class="card-body">
-          <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
-            <div>
-              <h3 class="sales-h3 mb-1">Top products</h3>
-              <p class="text-muted small mb-0">Highest revenue items</p>
-            </div>
-            <span class="badge sales-badge sales-badge-neutral">Top N</span>
-          </div>
+          <h3 class="sales-h3 mb-1">Top products</h3>
+          <p class="text-muted small mb-0">Highest revenue items</p>
           <div class="sales-chart mt-3">
             <div id="sales_top_products" class="sales-plot"></div>
           </div>
@@ -259,13 +302,8 @@
     <div class="col-lg-6">
       <div class="card sales-card">
         <div class="card-body">
-          <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
-            <div>
-              <h3 class="sales-h3 mb-1">Store performance</h3>
-              <p class="text-muted small mb-0">Top stores by revenue</p>
-            </div>
-            <span class="badge sales-badge sales-badge-neutral">Ranking</span>
-          </div>
+          <h3 class="sales-h3 mb-1">Store performance</h3>
+          <p class="text-muted small mb-0">Top stores by revenue</p>
           <div class="sales-chart mt-3">
             <div id="sales_top_stores" class="sales-plot"></div>
           </div>
@@ -276,13 +314,8 @@
     <div class="col-lg-5">
       <div class="card sales-card">
         <div class="card-body">
-          <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
-            <div>
-              <h3 class="sales-h3 mb-1">Payment mix</h3>
-              <p class="text-muted small mb-0">Share by payment method</p>
-            </div>
-            <span class="badge sales-badge sales-badge-neutral">Distribution</span>
-          </div>
+          <h3 class="sales-h3 mb-1">Payment mix</h3>
+          <p class="text-muted small mb-0">Share by payment method</p>
           <div class="sales-chart mt-3">
             <div id="sales_payment_mix" class="sales-plot"></div>
           </div>
@@ -293,13 +326,8 @@
     <div class="col-lg-7">
       <div class="card sales-card">
         <div class="card-body">
-          <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
-            <div>
-              <h3 class="sales-h3 mb-1">Forecast vs actual demand</h3>
-              <p class="text-muted small mb-0">Demand planning quality signal</p>
-            </div>
-            <span class="badge sales-badge sales-badge-primary">Ops</span>
-          </div>
+          <h3 class="sales-h3 mb-1">Forecast vs actual demand</h3>
+          <p class="text-muted small mb-0">Demand planning quality signal</p>
           <div class="sales-chart mt-3">
             <div id="sales_forecast_scatter" class="sales-plot"></div>
           </div>
@@ -312,13 +340,8 @@
   <!-- DETAILS TABLE -->
   <section class="card sales-card mb-4 fade-in-up">
     <div class="card-body">
-      <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
-        <div>
-          <h3 class="sales-h3 mb-1">Quick view</h3>
-          <p class="text-muted small mb-0">A small sample of filtered rows (for transparency)</p>
-        </div>
-        <span class="badge sales-badge sales-badge-neutral">Preview</span>
-      </div>
+      <h3 class="sales-h3 mb-1">Quick view</h3>
+      <p class="text-muted small mb-0">Sample of filtered rows</p>
 
       <div class="sales-table-wrap mt-3">
         <div class="table-responsive sales-table-inner">
@@ -342,21 +365,18 @@
           </table>
         </div>
       </div>
-
     </div>
   </section>
 
 </div>
 
-<!-- PLOTLY SCRIPTS -->
 <script>
-  // Each chart comes as Plotly JSON in the context
-  const revTrend   = {{ charts.rev_trend_json | safe }};
-  const revCat     = {{ charts.rev_category_json | safe }};
-  const topProd    = {{ charts.top_products_json | safe }};
-  const topStores  = {{ charts.top_stores_json | safe }};
-  const payMix     = {{ charts.payment_mix_json | safe }};
-  const fcScatter  = {{ charts.forecast_scatter_json | safe }};
+  const revTrend   = JSON.parse({{ charts.rev_trend_json | tojson }});
+  const revCat     = JSON.parse({{ charts.rev_category_json | tojson }});
+  const topProd    = JSON.parse({{ charts.top_products_json | tojson }});
+  const topStores  = JSON.parse({{ charts.top_stores_json | tojson }});
+  const payMix     = JSON.parse({{ charts.payment_mix_json | tojson }});
+  const fcScatter  = JSON.parse({{ charts.forecast_scatter_json | tojson }});
 
   Plotly.newPlot("sales_rev_trend",        revTrend.data,  revTrend.layout,  {responsive: true});
   Plotly.newPlot("sales_rev_category",     revCat.data,    revCat.layout,    {responsive: true});
@@ -364,6 +384,13 @@
   Plotly.newPlot("sales_top_stores",       topStores.data, topStores.layout, {responsive: true});
   Plotly.newPlot("sales_payment_mix",      payMix.data,    payMix.layout,    {responsive: true});
   Plotly.newPlot("sales_forecast_scatter", fcScatter.data, fcScatter.layout, {responsive: true});
+
+  {% if compare %}
+    const cmpTrend = JSON.parse({{ compare.trend_compare_json | tojson }});
+    const cmpCat   = JSON.parse({{ compare.cat_compare_json | tojson }});
+    Plotly.newPlot("sales_cmp_trend",    cmpTrend.data, cmpTrend.layout, {responsive: true});
+    Plotly.newPlot("sales_cmp_category", cmpCat.data,   cmpCat.layout,   {responsive: true});
+  {% endif %}
 </script>
 
 {% endblock %}

@@ -1,5 +1,6 @@
 /* ======================================================
    TEMA CLARO ELEGANTE · PROFISSIONAL · CORPORATE STYLE
+   (Base + Index + Ames + Sales)
    ====================================================== */
 
 /* Fundo geral em cinza muito suave */
@@ -77,7 +78,8 @@ h3, .h3 {
 .form-select,
 textarea,
 input[type="number"],
-input[type="text"] {
+input[type="text"],
+input[type="date"] {
   background-color: #ffffff !important;
   border: 1px solid #d1d5db !important;
   color: #1e293b !important;
@@ -87,7 +89,8 @@ input[type="text"] {
 
 .form-control:focus,
 .form-select:focus,
-textarea:focus {
+textarea:focus,
+input[type="date"]:focus {
   border-color: #0ea5e9 !important;
   box-shadow: 0 0 0 0.15rem rgba(14,165,233,0.25) !important;
 }
@@ -171,189 +174,10 @@ a:hover {
 }
 
 /* -------------------------------
-   GRÁFICOS
-----------------------------------*/
-.chart-wrap {
-  background-color: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 12px;
-  padding: 1rem;
-}
-
-/* -------------------------------
    RODAPÉ
 ----------------------------------*/
 .app-footer {
   color: #6b7280 !important;
-}
-
-/* ======================================================
-   PÁGINA DE COTAÇÕES
-   Layout, centralização, métricas, animação
-   ====================================================== */
-
-/* Container geral da página de cotações */
-.quotes-page {
-  max-width: 1100px;
-  margin: 1.5rem auto 2.5rem;
-  padding: 0 1rem;
-}
-
-/* Centralizar títulos da página de cotações */
-.quotes-page h1,
-.quotes-page h2,
-.quotes-page h3 {
-  text-align: center;
-}
-
-/* Centralizar textos (parágrafos) da página de cotações */
-.quotes-page p,
-.quotes-page .muted {
-  text-align: center;
-}
-
-/* Header da página de cotações */
-.quotes-header {
-  margin-bottom: 1rem;
-}
-
-.quotes-header p {
-  max-width: 720px;
-  margin: 0.5rem auto 0;
-}
-
-/* -------------------------------
-   Formulário de Cotações
-----------------------------------*/
-.quotes-form-card {
-  margin-top: 1rem;
-}
-
-.quotes-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-/* Grid dos campos do formulário */
-.quotes-form-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem 1rem;
-}
-
-/* Labels alinhados à esquerda, mesmo com textos centrados no resto */
-.quotes-form-grid label {
-  display: flex;
-  flex-direction: column;
-  font-size: 0.9rem;
-  color: #475569;
-  text-align: left;
-}
-
-.form-label-text {
-  margin-bottom: 0.25rem;
-  font-weight: 500;
-}
-
-/* Botões alinhados à direita (desktop) */
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 0.5rem;
-}
-
-/* Responsivo – em telas pequenas, 1 coluna e botão central */
-@media (max-width: 768px) {
-  .quotes-form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .form-actions {
-    justify-content: center;
-  }
-}
-
-@media (max-width: 768px) {
-  .metrics-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* -------------------------------
-   Seções da página de cotações
-----------------------------------*/
-.section-card {
-  margin-top: 1.25rem;
-}
-
-/* -------------------------------
-   Métricas de erro · Cards (MAIORES)
-----------------------------------*/
-.metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(200px, 1fr)); /* cartões mais largos */
-  gap: 16px;
-  margin-top: 16px;
-  max-width: 880px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.metric-box {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 1rem 1.2rem;               /* mais espaço interno */
-  min-height: 110px;                  /* garante altura maior */
-  box-shadow:
-    0 2px 4px rgba(15, 23, 42, 0.06),
-    0 0 0 1px rgba(148, 163, 184, 0.06);
-  cursor: help;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.metric-box strong {
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #64748b;
-}
-
-.metric-value {
-  margin-top: 6px;
-  font-family: "SFMono-Regular", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 1.05rem;                 /* número mais destacado */
-  font-weight: 700;
-  color: #0f172a;
-}
-
-
-/* -------------------------------
-   Tabela de Previsão Centralizada
-----------------------------------*/
-.forecast-table-container {
-  display: flex;
-  justify-content: center;
-  margin-top: 12px;
-}
-
-.forecast-table-inner {
-  max-height: 320px;
-  overflow: auto;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  background: #ffffff;
-  padding: 0.25rem;
-}
-
-.forecast-table-inner .table {
-  margin-bottom: 0;
-  width: auto;
-  min-width: 260px;
-  font-variant-numeric: tabular-nums;
 }
 
 /* -------------------------------
@@ -376,268 +200,10 @@ a:hover {
   }
 }
 
-
-/* Ícone de informação (tooltips) */
-.info-icon {
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  line-height: 17px;
-  border-radius: 50%;
-  text-align: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: #0ea5e9;
-  border: 1px solid #0ea5e9;
-  cursor: help;
-  margin-left: 6px;
-  user-select: none;
-}
-
-/* Card de resultado de risco */
-.risk-card {
-  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 40%, #eef2ff 100%);
-}
-
-/* Badges de risco */
-.badge-risk-high,
-.badge-risk-low,
-.badge-risk-unknown {
-  display: inline-block;
-  padding: 0.25rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.badge-risk-high {
-  background-color: #fee2e2;
-  color: #b91c1c;
-}
-
-.badge-risk-low {
-  background-color: #dcfce7;
-  color: #166534;
-}
-
-.badge-risk-unknown {
-  background-color: #e5e7eb;
-  color: #374151;
-}
-
-/* Barra de risco (probabilidade) */
-.risk-bar {
-  margin-top: 0.5rem;
-  width: 100%;
-  max-width: 480px;
-  margin-left: auto;
-  margin-right: auto;
-  height: 10px;
-  border-radius: 999px;
-  background: #e5e7eb;
-  overflow: hidden;
-}
-
-.risk-bar-fill {
-  height: 100%;
-  border-radius: 999px;
-  transition: width 0.4s ease;
-}
-
-.risk-bar-high {
-  background: linear-gradient(90deg, #f97316, #ef4444);
-}
-
-.risk-bar-low {
-  background: linear-gradient(90deg, #22c55e, #16a34a);
-}
-
-
-/* Card de sentimento */
-.sentiment-card {
-  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 40%, #ecfeff 100%);
-}
-
-/* Badges de sentimento */
-.sentiment-badge-positive,
-.sentiment-badge-negative,
-.sentiment-badge-neutral {
-  display: inline-block;
-  padding: 0.25rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.sentiment-badge-positive {
-  background-color: #dcfce7;
-  color: #166534;
-}
-
-.sentiment-badge-negative {
-  background-color: #fee2e2;
-  color: #b91c1c;
-}
-
-.sentiment-badge-neutral {
-  background-color: #e5e7eb;
-  color: #374151;
-}
-
-/* Barra de score de sentimento */
-.sentiment-score-bar {
-  margin-top: 0.5rem;
-  width: 100%;
-  max-width: 420px;
-  margin-left: auto;
-  margin-right: auto;
-  height: 10px;
-  border-radius: 999px;
-  background: #e5e7eb;
-  overflow: hidden;
-}
-
-.sentiment-score-bar-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #0ea5e9, #22c55e);
-  transition: width 0.4s ease;
-}
-
-
 /* ======================================================
-   BOTÕES DE APLICAÇÃO · PREMIUM, SIMPLES E CORPORATE
+   INDEX / HERO
    ====================================================== */
 
-.app-buttons {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 18px;
-  margin-top: 24px;
-}
-
-/* Card-botão principal */
-.app-btn {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: flex-start;
-  justify-content: flex-start;
-  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 50%, #eef2ff 100%);
-  border: 1px solid #e2e8f0;
-  padding: 16px 18px 18px;
-  border-radius: 14px;
-  text-decoration: none !important;
-  color: #0f172a !important;
-  box-shadow:
-    0 8px 20px rgba(15, 23, 42, 0.04),
-    0 0 0 1px rgba(148, 163, 184, 0.22);
-  transition: all 0.22s ease;
-  overflow: hidden;
-}
-
-/* Efeito de brilho suave no hover */
-.app-btn::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.25), transparent 55%);
-  opacity: 0;
-  transition: opacity 0.25s ease;
-}
-
-.app-btn:hover {
-  transform: translateY(-3px);
-  box-shadow:
-    0 14px 30px rgba(15, 23, 42, 0.12),
-    0 0 0 1px rgba(56, 189, 248, 0.4);
-}
-
-.app-btn:hover::before {
-  opacity: 1;
-}
-
-/* Conteúdo interno acima do pseudo-elemento */
-.app-btn-inner {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-/* Ícone circular */
-.app-btn-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  font-weight: 600;
-  background: linear-gradient(135deg, #0ea5e9, #6366f1);
-  color: #f9fafb;
-  margin-bottom: 4px;
-}
-
-/* Título e descrição */
-.app-btn-title {
-  font-size: 0.98rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-.app-btn-desc {
-  font-size: 0.82rem;
-  color: #64748b;
-}
-
-/* Badge/categoria no canto inferior */
-.app-btn-meta {
-  margin-top: 6px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.app-badge {
-  font-size: 0.72rem;
-  padding: 3px 7px;
-  border-radius: 999px;
-  background-color: rgba(15, 23, 42, 0.04);
-  color: #475569;
-  border: 1px solid rgba(148, 163, 184, 0.5);
-}
-
-/* Variantes de cor sutis para categorias (opcional) */
-.app-badge-ml {
-  background-color: rgba(56, 189, 248, 0.08);
-  border-color: rgba(56, 189, 248, 0.45);
-  color: #0369a1;
-}
-
-.app-badge-fin {
-  background-color: rgba(59, 130, 246, 0.08);
-  border-color: rgba(59, 130, 246, 0.45);
-  color: #1d4ed8;
-}
-
-.app-badge-nlp {
-  background-color: rgba(168, 85, 247, 0.08);
-  border-color: rgba(168, 85, 247, 0.45);
-  color: #6b21a8;
-}
-
-.app-badge-biz {
-  background-color: rgba(16, 185, 129, 0.08);
-  border-color: rgba(16, 185, 129, 0.45);
-  color: #047857;
-}
-
-/* Pequeno ajuste em herói / títulos para combinar */
 .hero h1 {
   font-size: 1.9rem;
   font-weight: 700;
@@ -659,7 +225,6 @@ a:hover {
   transform: translateY(-4px);
   box-shadow: 0 6px 14px rgba(0,0,0,0.07);
 }
-
 
 /* ======================================================
    AMES PAGE · PREMIUM STYLE
@@ -859,7 +424,6 @@ a:hover {
   .ames-plot-tall { min-height: 420px; }
 }
 
-
 /* ======================================================
    SALES DASHBOARD · PREMIUM STYLE
    ====================================================== */
@@ -889,12 +453,12 @@ a:hover {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #64748b;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .sales-h1 {
   margin: 6px 0 6px;
-  font-weight: 780;
+  font-weight: 750;
   letter-spacing: -0.02em;
   color: #0f172a;
 }
@@ -906,6 +470,8 @@ a:hover {
   font-size: 0.98rem;
   line-height: 1.5;
 }
+
+.sales-hero-chip { margin-top: 2px; }
 
 .sales-chip-row {
   display: flex;
@@ -936,7 +502,7 @@ a:hover {
 }
 
 .sales-label {
-  font-weight: 650;
+  font-weight: 600;
   color: #475569;
 }
 
@@ -949,7 +515,7 @@ a:hover {
 .sales-badge {
   border-radius: 999px !important;
   padding: 8px 10px !important;
-  font-weight: 650;
+  font-weight: 600;
   font-size: 0.78rem;
   border: 1px solid rgba(148, 163, 184, 0.55);
 }
@@ -993,13 +559,13 @@ a:hover {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #64748b;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .sales-kpi-value {
   margin-top: 6px;
   font-size: 1.35rem;
-  font-weight: 780;
+  font-weight: 750;
   letter-spacing: -0.02em;
   color: #0f172a;
 }
@@ -1015,14 +581,14 @@ a:hover {
 
 .sales-h2 {
   font-size: 1.05rem;
-  font-weight: 780;
+  font-weight: 750;
   letter-spacing: -0.01em;
   color: #0f172a;
 }
 
 .sales-h3 {
   font-size: 1.02rem;
-  font-weight: 780;
+  font-weight: 750;
   letter-spacing: -0.01em;
   color: #0f172a;
 }
@@ -1040,6 +606,7 @@ a:hover {
   min-height: 360px;
 }
 
+/* Preview table */
 .sales-table-wrap {
   border: 1px solid rgba(226, 232, 240, 1);
   border-radius: 14px;
@@ -1057,14 +624,46 @@ a:hover {
   white-space: nowrap;
 }
 
+/* Comparison */
+.sales-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.sales-compare-card {
+  background: rgba(15, 23, 42, 0.02);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.sales-compare-title {
+  font-weight: 750;
+  color: #0f172a;
+  margin-bottom: 8px;
+}
+
+.sales-compare-kpi {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.sales-compare-kpi:first-of-type { border-top: none; }
+
 @media (max-width: 1200px) {
-  .sales-kpi-grid {
-    grid-template-columns: repeat(2, minmax(220px, 1fr));
-  }
+  .sales-kpi-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+}
+
+@media (max-width: 992px) {
+  .sales-chip-row { justify-content: flex-start; }
 }
 
 @media (max-width: 768px) {
-  .sales-chip-row { justify-content: flex-start; }
   .sales-kpi-grid { grid-template-columns: 1fr; }
+  .sales-compare-grid { grid-template-columns: 1fr; }
   .sales-plot { min-height: 320px; }
 }
