@@ -858,3 +858,213 @@ a:hover {
   .ames-plot { min-height: 320px; }
   .ames-plot-tall { min-height: 420px; }
 }
+
+
+/* ======================================================
+   SALES DASHBOARD · PREMIUM STYLE
+   ====================================================== */
+
+.sales-page {
+  font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+.sales-hero {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 45%, #eef2ff 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 18px 18px 16px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.sales-hero-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.sales-kicker {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.sales-h1 {
+  margin: 6px 0 6px;
+  font-weight: 780;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+.sales-subtitle {
+  margin: 0;
+  max-width: 900px;
+  color: #64748b;
+  font-size: 0.98rem;
+  line-height: 1.5;
+}
+
+.sales-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.sales-chip {
+  font-size: 0.75rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  background: rgba(255, 255, 255, 0.65);
+  color: #475569;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.sales-panel,
+.sales-card {
+  border-radius: 16px !important;
+  padding: 0 !important;
+}
+
+.sales-panel .card-body,
+.sales-card .card-body {
+  padding: 16px 16px;
+}
+
+.sales-label {
+  font-weight: 650;
+  color: #475569;
+}
+
+.sales-badge-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sales-badge {
+  border-radius: 999px !important;
+  padding: 8px 10px !important;
+  font-weight: 650;
+  font-size: 0.78rem;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+}
+
+.sales-badge-primary {
+  background: rgba(14, 165, 233, 0.10) !important;
+  color: #0369a1 !important;
+  border-color: rgba(14, 165, 233, 0.35) !important;
+}
+
+.sales-badge-neutral {
+  background: rgba(15, 23, 42, 0.04) !important;
+  color: #475569 !important;
+}
+
+.sales-hr {
+  border: none;
+  height: 1px;
+  background: rgba(148, 163, 184, 0.45);
+  margin: 14px 0;
+}
+
+.sales-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.sales-kpi {
+  border-radius: 16px !important;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.sales-kpi .card-body {
+  padding: 14px 16px;
+}
+
+.sales-kpi-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  font-weight: 750;
+}
+
+.sales-kpi-value {
+  margin-top: 6px;
+  font-size: 1.35rem;
+  font-weight: 780;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+.sales-kpi-foot {
+  margin-top: 6px;
+}
+
+.sales-mono {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.sales-h2 {
+  font-size: 1.05rem;
+  font-weight: 780;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+.sales-h3 {
+  font-size: 1.02rem;
+  font-weight: 780;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+.sales-chart {
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 1);
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
+.sales-plot {
+  width: 100%;
+  min-height: 360px;
+}
+
+.sales-table-wrap {
+  border: 1px solid rgba(226, 232, 240, 1);
+  border-radius: 14px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.sales-table-inner {
+  max-height: 340px;
+  overflow: auto;
+}
+
+.sales-td {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 1200px) {
+  .sales-kpi-grid {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .sales-chip-row { justify-content: flex-start; }
+  .sales-kpi-grid { grid-template-columns: 1fr; }
+  .sales-plot { min-height: 320px; }
+}

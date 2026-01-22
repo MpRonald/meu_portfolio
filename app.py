@@ -94,6 +94,44 @@ def _configure_logging(app: Flask) -> None:
     )
 
 
+def _load_walmart_sales_csv(data_dir: Path) -> pd.DataFrame:
+    """
+    Procura Walmart.csv / walmart.csv dentro de data_dir.
+    """
+    candidates = [
+        data_dir / "Walmart.csv",
+        data_dir / "walmart.csv",
+    ]
+    csv_path = None
+    for p in candidates:
+        if p.exists():
+            csv_path = p
+            break
+    if csv_path is None:
+        raise FileNotFoundError(
+            f"CSV do Walmart não encontrado em {data_dir}. "
+            f"Coloca o ficheiro em: data/Walmart.csv"
+        )
+
+    df = pd.read_csv(csv_path)
+
+    # Normaliza datas
+    if "transaction_date" in df.columns:
+        df["transaction_date"] = pd.to_datetime(df["transaction_date"], errors="coerce")
+    # Medidas úteis
+    if {"quantity_sold", "unit_price"}.issubset(df.columns):
+        df["revenue"] = pd.to_numeric(df["quantity_sold"], errors="coerce") * pd.to_numeric(df["unit_price"], errors="coerce")
+
+    # Booleans
+    for bcol in ["promotion_applied", "holiday_indicator", "stockout_indicator"]:
+        if bcol in df.columns:
+            if df[bcol].dtype == object:
+                df[bcol] = df[bcol].astype(str).str.strip().str.lower().map(
+                    {"true": True, "false": False, "1": True, "0": False, "yes": True, "no": False}
+                ).fillna(df[bcol])
+    return df
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
@@ -115,7 +153,7 @@ def create_app() -> Flask:
 
     _configure_logging(app)
 
-    # Service com acesso ao DATA_DIR
+    # Service com acesso ao DATA_DIR (Ames)
     service = PortfolioService(timeout=30, data_dir=app.config["DATA_DIR"])
 
     @app.after_request
@@ -161,6 +199,194 @@ def create_app() -> Flask:
     @app.route("/")
     def index():
         return safe_render("index.html")
+
+    # =========================
+    # SALES (WALMART)
+    # =========================
+    @app.route("/sales", methods=["GET"])
+    def sales_dashboard():
+        """
+        Dashboard de BI com filtros via querystring:
+          - start=YYYY-MM-DD
+          - end=YYYY-MM-DD
+          - category=...
+          - store=...
+          - promo=true/false/all
+        """
+        df = _load_walmart_sales_csv(DATA_DIR)
+
+        # Filtros (GET)
+        start = (request.args.get("start") or "").strip()
+        end = (request.args.get("end") or "").strip()
+        category = (request.args.get("category") or "").strip()
+        store = (request.args.get("store") or "").strip()
+        promo = (request.args.get("promo") or "all").strip().lower()
+
+        df_f = df.copy()
+
+        # date range
+        if "transaction_date" in df_f.columns:
+            if start:
+                dt_start = pd.to_datetime(start, errors="coerce")
+                if pd.notna(dt_start):
+                    df_f = df_f[df_f["transaction_date"] >= dt_start]
+            if end:
+                dt_end = pd.to_datetime(end, errors="coerce")
+                if pd.notna(dt_end):
+                    # inclui o dia inteiro
+                    df_f = df_f[df_f["transaction_date"] < (dt_end + pd.Timedelta(days=1))]
+
+        # category
+        if category and "category" in df_f.columns:
+            df_f = df_f[df_f["category"].astype(str) == category]
+
+        # store
+        if store and "store_location" in df_f.columns:
+            df_f = df_f[df_f["store_location"].astype(str) == store]
+
+        # promo
+        if promo in {"true", "false"} and "promotion_applied" in df_f.columns:
+            df_f = df_f[df_f["promotion_applied"] == (promo == "true")]
+
+        # Listas para dropdowns (sem depender do filtro atual)
+        categories = sorted(df["category"].dropna().astype(str).unique().tolist()) if "category" in df.columns else []
+        stores = sorted(df["store_location"].dropna().astype(str).unique().tolist()) if "store_location" in df.columns else []
+
+        # KPIs
+        total_revenue = float(df_f["revenue"].sum()) if "revenue" in df_f.columns else 0.0
+        total_units = int(pd.to_numeric(df_f.get("quantity_sold"), errors="coerce").fillna(0).sum()) if "quantity_sold" in df_f.columns else 0
+        orders = int(df_f["transaction_id"].nunique()) if "transaction_id" in df_f.columns else int(len(df_f))
+        customers = int(df_f["customer_id"].nunique()) if "customer_id" in df_f.columns else 0
+        aov = float(total_revenue / orders) if orders > 0 else 0.0
+
+        promo_share = None
+        if "promotion_applied" in df_f.columns and len(df_f) > 0:
+            promo_share = float(df_f["promotion_applied"].mean() * 100.0)
+
+        stockout_rate = None
+        if "stockout_indicator" in df_f.columns and len(df_f) > 0:
+            stockout_rate = float(df_f["stockout_indicator"].mean() * 100.0)
+
+        # ================
+        # Charts (Plotly)
+        # ================
+        graph_rev_ts_json = None
+        if "transaction_date" in df_f.columns and "revenue" in df_f.columns:
+            ts = (
+                df_f.dropna(subset=["transaction_date"])
+                .assign(day=lambda x: x["transaction_date"].dt.date)
+                .groupby("day", as_index=False)["revenue"].sum()
+                .sort_values("day")
+            )
+            if len(ts) > 0:
+                fig = px.line(ts, x="day", y="revenue", title="Revenue over time (daily)")
+                fig.update_layout(margin=dict(l=10, r=10, t=50, b=10))
+                graph_rev_ts_json = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+
+        graph_cat_json = None
+        if "category" in df_f.columns and "revenue" in df_f.columns:
+            cat = (
+                df_f.groupby("category", as_index=False)["revenue"].sum()
+                .sort_values("revenue", ascending=False)
+            )
+            if len(cat) > 0:
+                fig = px.bar(cat, x="category", y="revenue", title="Revenue by category")
+                fig.update_layout(margin=dict(l=10, r=10, t=50, b=10), xaxis_tickangle=-20)
+                graph_cat_json = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+
+        graph_store_json = None
+        if "store_location" in df_f.columns and "revenue" in df_f.columns:
+            st = (
+                df_f.groupby("store_location", as_index=False)["revenue"].sum()
+                .sort_values("revenue", ascending=False)
+                .head(15)
+            )
+            if len(st) > 0:
+                fig = px.bar(st, x="store_location", y="revenue", title="Top stores by revenue (Top 15)")
+                fig.update_layout(margin=dict(l=10, r=10, t=50, b=10), xaxis_tickangle=-25)
+                graph_store_json = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+
+        graph_pay_json = None
+        if "payment_method" in df_f.columns and "revenue" in df_f.columns:
+            pm = (
+                df_f.groupby("payment_method", as_index=False)["revenue"].sum()
+                .sort_values("revenue", ascending=False)
+            )
+            if len(pm) > 0:
+                fig = px.pie(pm, names="payment_method", values="revenue", title="Revenue share by payment method")
+                fig.update_layout(margin=dict(l=10, r=10, t=50, b=10))
+                graph_pay_json = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+
+        graph_demand_json = None
+        if {"forecasted_demand", "actual_demand"}.issubset(df_f.columns):
+            dd = df_f[["forecasted_demand", "actual_demand"]].dropna()
+            if len(dd) > 0:
+                fig = px.scatter(
+                    dd,
+                    x="forecasted_demand",
+                    y="actual_demand",
+                    title="Forecasted vs Actual demand",
+                    trendline="ols" if len(dd) >= 30 else None,
+                )
+                fig.update_layout(margin=dict(l=10, r=10, t=50, b=10))
+                graph_demand_json = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+
+        # Top products table
+        top_products = []
+        if {"product_name", "revenue"}.issubset(df_f.columns):
+            tp = (
+                df_f.groupby("product_name", as_index=False)["revenue"].sum()
+                .sort_values("revenue", ascending=False)
+                .head(10)
+            )
+            top_products = tp.to_dict(orient="records")
+
+        # Preview table (últimas 15 transações)
+        preview_rows = []
+        preview_cols = []
+        if len(df_f) > 0:
+            cols = [c for c in ["transaction_date", "store_location", "category", "product_name", "quantity_sold", "unit_price", "revenue", "promotion_applied"] if c in df_f.columns]
+            preview_cols = cols
+            prev = df_f.sort_values("transaction_date" if "transaction_date" in df_f.columns else df_f.index, ascending=False).head(15)
+            prev = prev[cols].copy() if cols else prev.head(15)
+            # serialização simples
+            if "transaction_date" in prev.columns:
+                prev["transaction_date"] = prev["transaction_date"].dt.strftime("%Y-%m-%d %H:%M")
+            preview_rows = prev.to_dict(orient="records")
+
+        ctx = dict(
+            # filtros
+            start=start,
+            end=end,
+            category=category,
+            store=store,
+            promo=promo,
+            categories=categories,
+            stores=stores,
+
+            # kpis
+            total_revenue=total_revenue,
+            total_units=total_units,
+            orders=orders,
+            customers=customers,
+            aov=aov,
+            promo_share=promo_share,
+            stockout_rate=stockout_rate,
+
+            # charts
+            graph_rev_ts_json=graph_rev_ts_json,
+            graph_cat_json=graph_cat_json,
+            graph_store_json=graph_store_json,
+            graph_pay_json=graph_pay_json,
+            graph_demand_json=graph_demand_json,
+
+            # tables
+            top_products=top_products,
+            preview_cols=preview_cols,
+            preview_rows=preview_rows,
+        )
+
+        return safe_render("sales.html", **ctx)
 
     # =========================
     # AMES

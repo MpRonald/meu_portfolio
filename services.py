@@ -1,22 +1,10 @@
-import requests
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any
 
 import numpy as np
 import pandas as pd
 from scipy import stats
-
-# ===== FX deps =====
-import yfinance as yf
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-from statsmodels.tsa.arima.model import ARIMA
-
-# Plotly (para gerar o HTML do gráfico no service)
-import plotly.graph_objects as go
-import plotly.io as pio
 
 
 class PortfolioService:
@@ -24,61 +12,9 @@ class PortfolioService:
         self.timeout = timeout
         self.data_dir = Path(data_dir) if data_dir else None
 
-    # =========================
-    # Weather (Open-Meteo)
-    # =========================
-    def geocode_city(self, name: str, count: int = 1, lang: str = "pt") -> dict:
-        url = "https://geocoding-api.open-meteo.com/v1/search"
-        params = {"name": name, "count": count, "language": lang, "format": "json"}
-        r = requests.get(url, params=params, timeout=self.timeout)
-        r.raise_for_status()
-        js = r.json()
-        res = (js.get("results") or [])
-        if not res:
-            return {}
-        top = res[0]
-        return {
-            "name": top.get("name"),
-            "country": top.get("country"),
-            "latitude": float(top["latitude"]),
-            "longitude": float(top["longitude"]),
-            "timezone": top.get("timezone"),
-        }
-
-    def fetch_weather_forecast(
-        self,
-        lat: float,
-        lon: float,
-        days: int = 7,
-        temp_unit: str = "celsius",
-        wind_unit: str = "kmh",
-        lang: str = "pt",
-    ) -> dict:
-        url = "https://api.open-meteo.com/v1/forecast"
-        daily = [
-            "temperature_2m_max",
-            "temperature_2m_min",
-            "precipitation_sum",
-            "wind_speed_10m_max",
-        ]
-        params = {
-            "latitude": lat,
-            "longitude": lon,
-            "daily": ",".join(daily),
-            "forecast_days": max(1, min(30, int(days))),
-            "timezone": "auto",
-            "temperature_unit": temp_unit,
-            "wind_speed_unit": wind_unit,
-            "past_days": 0,
-            "language": lang,
-        }
-        r = requests.get(url, params=params, timeout=self.timeout)
-        r.raise_for_status()
-        return r.json()
-
-    # =========================
-    # Ames (dataset + stats)
-    # =========================
+    # ======================================================
+    # ======================= AMES =========================
+    # ======================================================
     @lru_cache(maxsize=1)
     def load_ames_data(self) -> pd.DataFrame:
         if not self.data_dir:
@@ -90,7 +26,7 @@ class PortfolioService:
 
         df = pd.read_csv(csv_path)
 
-        # tenta garantir tipos numéricos em colunas que façam sentido
+        # Garantir tipos numéricos sempre que possível
         for c in df.columns:
             if c in {"faixa_preco", "bairro", "Neighborhood"}:
                 continue
@@ -184,7 +120,7 @@ class PortfolioService:
             resultados["jb_stat"] = None
             resultados["jb_p"] = None
 
-        # Pearson com preco e preco_m2
+        # Pearson (preco / preco_m2)
         for alvo in ["preco", "preco_m2"]:
             r_key = f"corr_{alvo}_r"
             p_key = f"corr_{alvo}_p"
@@ -205,7 +141,7 @@ class PortfolioService:
                 resultados[r_key] = None
                 resultados[p_key] = None
 
-        # Spearman com preco
+        # Spearman
         if "preco" in df_filtrado.columns and var in df_filtrado.columns and var != "preco":
             subset = df_filtrado[[var, "preco"]].dropna()
             if len(subset) >= 3:
@@ -223,10 +159,10 @@ class PortfolioService:
             resultados["corr_spearman_r"] = None
             resultados["corr_spearman_p"] = None
 
-        # Kruskal–Wallis por faixa_preco (só quando sem filtro: df_completo não None)
-        if df_completo is not None and "faixa_preco" in df_completo.columns and var in df_completo.columns:
+        # Kruskal–Wallis
+        if df_completo is not None and "faixa_preco" in df_completo.columns:
             grupos = []
-            for faixa in sorted(df_completo["faixa_preco"].dropna().unique().tolist()):
+            for faixa in df_completo["faixa_preco"].dropna().unique():
                 vals = df_completo.loc[df_completo["faixa_preco"] == faixa, var].dropna()
                 if len(vals) >= 3:
                     grupos.append(vals.values)
@@ -246,7 +182,7 @@ class PortfolioService:
             resultados["kruskal_H"] = None
             resultados["kruskal_p"] = None
 
-        # Regressão linear simples: preco ~ var
+        # Regressão linear simples
         if "preco" in df_filtrado.columns and var in df_filtrado.columns and var != "preco":
             subset = df_filtrado[[var, "preco"]].dropna()
             if len(subset) >= 3:
@@ -274,267 +210,46 @@ class PortfolioService:
 
         return resultados
 
-    # ============================================================
-    # ==== FX (RF / ARIMA / Prophet) =============================
-    # ============================================================
+    # ======================================================
+    # =================== WALMART SALES ====================
+    # ======================================================
+    @lru_cache(maxsize=1)
+    def load_walmart_sales_data(self) -> pd.DataFrame:
+        if not self.data_dir:
+            raise RuntimeError("data_dir não configurado no PortfolioService.")
 
-    FX_PAIRS = {
-        "USD/BRL": "BRL=X",
-        "EUR/USD": "EURUSD=X",
-        "USD/JPY": "JPY=X",
-        "GBP/USD": "GBPUSD=X",
-    }
+        csv_path = self.data_dir / "walmart.csv"
+        if not csv_path.exists():
+            alt = self.data_dir / "Walmart.csv"
+            if alt.exists():
+                csv_path = alt
+            else:
+                raise FileNotFoundError("walmart.csv não encontrado em data/")
 
-    FX_WINDOW_SIZE = 30
-    FX_RANDOM_STATE = 42
+        df = pd.read_csv(csv_path)
 
-    # ✅ ISTO FALTAVA (para o app.py)
-    def fx_pairs(self) -> dict:
-        return dict(self.FX_PAIRS)
+        # Datas
+        df["transaction_date"] = pd.to_datetime(df["transaction_date"], errors="coerce")
+        df["year"] = df["transaction_date"].dt.year
+        df["month"] = df["transaction_date"].dt.to_period("M").astype(str)
+        df["weekday"] = df["transaction_date"].dt.day_name()
 
-    def fx_download_history(self, ticker: str, period: str = "3y") -> pd.Series:
-        data = yf.download(ticker, period=period, interval="1d", auto_adjust=True)
-        if data is None or data.empty:
-            raise ValueError(f"Sem dados históricos para o ticker {ticker}.")
-        s = data["Close"].dropna().copy()
-        s.index = pd.to_datetime(s.index).tz_localize(None)
-        s = s.sort_index()
-        s.name = "rate"
-        return s
+        # Booleanos
+        for col in ["promotion_applied", "holiday_indicator", "stockout_indicator"]:
+            df[col] = df[col].astype(str).str.lower().map({"true": True, "false": False})
 
-    def stock_download_history(self, ticker: str, period: str = "3y") -> pd.Series:
-        data = yf.download(ticker, period=period, interval="1d", auto_adjust=True)
-        if data is None or data.empty:
-            raise ValueError(f"Sem dados históricos para o ticker {ticker}.")
-        s = data["Close"].dropna().copy()
-        s.index = pd.to_datetime(s.index).tz_localize(None)
-        s = s.sort_index()
-        s.name = "price"
-        return s
+        # Numéricos
+        for col in [
+            "quantity_sold", "unit_price", "forecasted_demand",
+            "actual_demand", "inventory_level"
+        ]:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    def fx_compute_metrics(self, y_true, y_pred) -> dict:
-        y_true = np.array(y_true, dtype=float)
-        y_pred = np.array(y_pred, dtype=float)
+        # Métricas derivadas
+        df["revenue"] = df["quantity_sold"] * df["unit_price"]
+        df["forecast_error"] = df["actual_demand"] - df["forecasted_demand"]
+        df["forecast_ape"] = (
+            df["forecast_error"].abs() / df["actual_demand"].replace(0, np.nan)
+        ) * 100
 
-        mae = mean_absolute_error(y_true, y_pred)
-        mse = mean_squared_error(y_true, y_pred)
-        rmse = float(np.sqrt(mse))
-
-        denom = np.clip(np.abs(y_true), 1e-8, None)
-        mape = float(np.mean(np.abs((y_true - y_pred) / denom)) * 100.0)
-
-        return {"mae": float(mae), "rmse": rmse, "mape": mape}
-
-    def fx_create_supervised(self, series: pd.Series, window_size: int = FX_WINDOW_SIZE):
-        values = np.asarray(series.values, dtype="float64").reshape(-1)
-        X, y = [], []
-        for i in range(window_size, len(values)):
-            X.append(values[i - window_size:i])
-            y.append(values[i])
-        X = np.array(X)
-        y = np.array(y)
-        return X, y
-
-    def fx_forecast_n_days_rf(
-        self,
-        model,
-        scaler,
-        history_series: pd.Series,
-        n_days: int,
-        window_size: int = FX_WINDOW_SIZE
-    ) -> pd.DataFrame:
-        if n_days <= 0:
-            raise ValueError("n_days deve ser > 0")
-        if n_days > 180:
-            raise ValueError("Não é permitido prever mais de 180 dias.")
-
-        history = history_series.copy().sort_index()
-        history_values = np.asarray(history.values, dtype="float64").reshape(-1)
-        if len(history_values) < window_size:
-            raise ValueError("Histórico insuficiente para formar a janela inicial.")
-
-        last_values = history_values[-window_size:].tolist()
-        last_date = history.index[-1]
-
-        future_dates = []
-        future_values = []
-
-        for step in range(1, n_days + 1):
-            X_input = np.array(last_values, dtype="float64").reshape(1, -1)
-            X_input_scaled = scaler.transform(X_input)
-            next_value = float(model.predict(X_input_scaled)[0])
-            next_date = last_date + pd.Timedelta(days=step)
-
-            future_dates.append(next_date)
-            future_values.append(next_value)
-
-            last_values = last_values[1:] + [next_value]
-
-        forecast_df = pd.DataFrame(
-            {"forecast_rate": future_values},
-            index=pd.DatetimeIndex(future_dates, name="date")
-        )
-        return forecast_df
-
-    def fx_train_and_forecast_rf(self, series: pd.Series, n_days: int):
-        X, y = self.fx_create_supervised(series, self.FX_WINDOW_SIZE)
-        if len(X) < 50:
-            raise ValueError("Dados insuficientes para treinar Random Forest (menos de 50 amostras).")
-
-        split = int(len(X) * 0.8)
-        X_train, X_test = X[:split], X[split:]
-        y_train, y_test = y[:split], y[split:]
-
-        scaler = StandardScaler()
-        X_train_scaled = scaler.fit_transform(X_train)
-        X_test_scaled = scaler.transform(X_test)
-
-        model = RandomForestRegressor(
-            n_estimators=300,
-            random_state=self.FX_RANDOM_STATE,
-            n_jobs=-1
-        )
-        model.fit(X_train_scaled, y_train)
-        y_pred_test = model.predict(X_test_scaled)
-
-        metrics = self.fx_compute_metrics(y_test, y_pred_test)
-        forecast_df = self.fx_forecast_n_days_rf(model, scaler, series, n_days, self.FX_WINDOW_SIZE)
-        return metrics, forecast_df
-
-    def fx_train_and_forecast_arima(self, series: pd.Series, n_days: int):
-        if len(series) < 80:
-            raise ValueError("Dados insuficientes para treinar ARIMA (menos de 80 observações).")
-
-        split = int(len(series) * 0.8)
-        train = series.iloc[:split]
-        test = series.iloc[split:]
-
-        model = ARIMA(train, order=(1, 1, 1))
-        model_fit = model.fit()
-
-        forecast_test = model_fit.forecast(steps=len(test))
-        metrics = self.fx_compute_metrics(test.values, forecast_test.values)
-
-        full_model = ARIMA(series, order=(1, 1, 1)).fit()
-        forecast_future = full_model.forecast(steps=n_days)
-
-        last_date = series.index[-1]
-        future_dates = [last_date + pd.Timedelta(days=i) for i in range(1, n_days + 1)]
-        forecast_df = pd.DataFrame(
-            {"forecast_rate": forecast_future.values},
-            index=pd.DatetimeIndex(future_dates, name="date")
-        )
-        return metrics, forecast_df
-
-    def fx_train_and_forecast_prophet(self, series: pd.Series, n_days: int):
-        # ✅ import lazy: só tenta importar quando escolheres prophet
-        try:
-            from prophet import Prophet
-        except Exception as e:
-            raise RuntimeError(
-                "Prophet não está disponível no ambiente. "
-                "Confirma se descomentaste 'prophet' no requirements.txt e se o deploy suportou a instalação."
-            ) from e
-
-        if len(series) < 80:
-            raise ValueError("Dados insuficientes para treinar Prophet (menos de 80 observações).")
-
-        df = series.reset_index()
-        df.columns = ["ds", "y"]
-
-        split = int(len(df) * 0.8)
-        train_df = df.iloc[:split]
-        test_df = df.iloc[split:]
-
-        m_metrics = Prophet()
-        m_metrics.fit(train_df)
-
-        future_test = m_metrics.make_future_dataframe(periods=len(test_df), freq="D")
-        forecast_test = m_metrics.predict(future_test)
-        forecast_test_tail = forecast_test.iloc[-len(test_df):]
-
-        y_true = test_df.set_index("ds")["y"]
-        y_pred = forecast_test_tail.set_index("ds")["yhat"]
-        common_idx = y_true.index.intersection(y_pred.index)
-        metrics = self.fx_compute_metrics(y_true.loc[common_idx], y_pred.loc[common_idx])
-
-        m_full = Prophet()
-        m_full.fit(df)
-        future_full = m_full.make_future_dataframe(periods=n_days, freq="D")
-        forecast_full = m_full.predict(future_full)
-        forecast_future = forecast_full.iloc[-n_days:][["ds", "yhat"]]
-
-        forecast_df = forecast_future.set_index("ds").rename(columns={"yhat": "forecast_rate"})
-        forecast_df.index.name = "date"
-        return metrics, forecast_df
-
-    def _fx_algoritmo_label(self, algoritmo: str) -> str:
-        alg = (algoritmo or "").lower().strip()
-        if alg == "rf":
-            return "Random Forest"
-        if alg == "arima":
-            return "ARIMA"
-        if alg == "prophet":
-            return "Prophet"
-        return alg.upper() if alg else "—"
-
-    def _fx_make_plot_div(self, history: pd.Series, forecast_df: pd.DataFrame, pair_name: str) -> str:
-        hist_tail = history.tail(180)  # desempenho e visual
-
-        fig = go.Figure()
-
-        fig.add_trace(go.Scatter(
-            x=hist_tail.index,
-            y=hist_tail.values,
-            mode="lines",
-            name="Histórico"
-        ))
-
-        fig.add_trace(go.Scatter(
-            x=forecast_df.index,
-            y=forecast_df["forecast_rate"].values,
-            mode="lines",
-            name="Previsão"
-        ))
-
-        fig.update_layout(
-            title=f"{pair_name} — histórico e previsão",
-            xaxis_title="Data",
-            yaxis_title="Taxa",
-            margin=dict(l=10, r=10, t=50, b=10),
-            height=520
-        )
-
-        # HTML pronto para embutir no template
-        return pio.to_html(fig, full_html=False, include_plotlyjs="cdn")
-
-    # ✅ ISTO FALTAVA (para o app.py)
-    def fx_run_forecast(self, pair_name: str, ticker: str, algoritmo: str, n_days: int) -> Dict[str, Any]:
-        alg = (algoritmo or "rf").lower().strip()
-        if n_days < 1 or n_days > 180:
-            raise ValueError("n_days deve estar entre 1 e 180.")
-
-        history = self.fx_download_history(ticker=ticker, period="3y")
-
-        if alg == "rf":
-            metrics, forecast_df = self.fx_train_and_forecast_rf(history, n_days)
-        elif alg == "arima":
-            metrics, forecast_df = self.fx_train_and_forecast_arima(history, n_days)
-        elif alg == "prophet":
-            metrics, forecast_df = self.fx_train_and_forecast_prophet(history, n_days)
-        else:
-            raise ValueError("Algoritmo inválido. Usa: rf, arima, prophet.")
-
-        fx_plot_div = self._fx_make_plot_div(history, forecast_df, pair_name)
-
-        # O template usa resultado.pair_name, resultado.algoritmo_label, resultado.metrics.mae, etc.
-        return {
-            "pair_name": pair_name,
-            "ticker": ticker,
-            "algoritmo": alg,
-            "algoritmo_label": self._fx_algoritmo_label(alg),
-            "n_days": int(n_days),
-            "metrics": metrics,
-            "forecast": forecast_df,
-            "fx_plot_div": fx_plot_div,
-        }
+        return df
