@@ -3,15 +3,12 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from io import StringIO
-from types import SimpleNamespace
 
 import pandas as pd
 import plotly
 import plotly.express as px
-from plotly.offline import plot as plotly_plot
 
-from flask import Flask, render_template, jsonify, request, make_response
+from flask import Flask, render_template, jsonify, request
 from werkzeug.middleware.proxy_fix import ProxyFix
 from jinja2 import TemplateNotFound
 
@@ -26,8 +23,6 @@ DATA_DIR = Path(os.getenv("DATA_DIR", str(BASE_DIR / "data"))).resolve()
 ARTIF_DIR = Path(os.getenv("ARTIF_DIR", str(BASE_DIR / "artifacts"))).resolve()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 ARTIF_DIR.mkdir(parents=True, exist_ok=True)
-
-WEATHER_DEFAULT_CITY = "Lisboa"
 
 
 # =========================
@@ -103,9 +98,7 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
-    # ✅ Inject current year into all templates (base.html footer, etc.)
-    from datetime import datetime
-
+    # ✅ Inject current year into all templates (base.html footer)
     @app.context_processor
     def inject_current_year():
         return {"current_year": datetime.now().year}
@@ -168,217 +161,6 @@ def create_app() -> Flask:
     @app.route("/")
     def index():
         return safe_render("index.html")
-
-    # =========================
-    # STUBS (para não quebrar o index.html)
-    # =========================
-    @app.route("/ecom")
-    def ecom_dashboard():
-        return safe_render("ecom.html", erro="(Em construção) A migrar para o novo app.")
-
-    @app.route("/ecom/rfm")
-    def ecom_rfm():
-        return safe_render("ecom_rfm.html", erro="(Em construção) A migrar para o novo app.")
-
-    @app.route("/ecom/forecast")
-    def ecom_forecast():
-        return safe_render("ecom_forecast.html", erro="(Em construção) A migrar para o novo app.")
-
-    @app.route("/ecom/clusters")
-    def ecom_clusters():
-        return safe_render("ecom_clusters.html", erro="(Em construção) A migrar para o novo app.")
-
-    @app.route("/quotes")
-    def quotes():
-        return safe_render("quotes.html", erro="(Em construção) A migrar para o novo app.")
-
-    # =========================
-    # FX (RF / ARIMA / Prophet)
-    # =========================
-    @app.route("/fx", methods=["GET", "POST"])
-    def fx():
-        pairs = dict(getattr(service, "FX_PAIRS", {}))  # existe no teu services.py
-
-        if request.method == "GET":
-            return safe_render("fx.html", pairs=pairs, resultado=None, erro=None)
-
-        # POST
-        try:
-            pair_name = (request.form.get("pair") or "").strip()
-            algoritmo = (request.form.get("algoritmo") or "rf").strip().lower()
-            n_days = int(request.form.get("n_days", 30))
-
-            if pair_name not in pairs:
-                raise ValueError("Par de moedas inválido.")
-            if n_days < 1 or n_days > 180:
-                raise ValueError("n_days deve estar entre 1 e 180.")
-            if algoritmo not in {"rf", "arima", "prophet"}:
-                raise ValueError("Algoritmo inválido.")
-
-            ticker = pairs[pair_name]
-            series = service.fx_download_history(ticker=ticker, period="3y")
-
-            # Treinar + prever
-            if algoritmo == "rf":
-                metrics, forecast_df = service.fx_train_and_forecast_rf(series, n_days)
-                algoritmo_label = "Random Forest"
-            elif algoritmo == "arima":
-                metrics, forecast_df = service.fx_train_and_forecast_arima(series, n_days)
-                algoritmo_label = "ARIMA"
-            else:
-                # Prophet pode não estar instalado -> mensagem amigável
-                try:
-                    metrics, forecast_df = service.fx_train_and_forecast_prophet(series, n_days)
-                except ModuleNotFoundError:
-                    raise RuntimeError("Prophet não está disponível neste deploy. Usa RF ou ARIMA.")
-                algoritmo_label = "Prophet"
-
-            # Gráfico: histórico recente + previsão
-            hist = series.copy().dropna()
-            hist_recent = hist.tail(180)  # deixa leve
-
-            df_hist = pd.DataFrame({"date": hist_recent.index, "value": hist_recent.values, "type": "Histórico"})
-            df_fc = pd.DataFrame({"date": forecast_df.index, "value": forecast_df["forecast_rate"].values, "type": "Previsão"})
-            df_plot = pd.concat([df_hist, df_fc], ignore_index=True)
-
-            fig = px.line(
-                df_plot,
-                x="date",
-                y="value",
-                color="type",
-                title=f"{pair_name} — Histórico e Previsão ({algoritmo_label})"
-            )
-            fig.update_layout(margin=dict(l=10, r=10, t=50, b=10))
-            fx_plot_div = plotly_plot(fig, output_type="div", include_plotlyjs=False)
-
-            # Montar objeto compatível com o template (acesso por ponto)
-            resultado = SimpleNamespace(
-                pair_name=pair_name,
-                algoritmo=algoritmo,
-                algoritmo_label=algoritmo_label,
-                n_days=n_days,
-                metrics=SimpleNamespace(**metrics),
-                forecast=forecast_df,
-                fx_plot_div=fx_plot_div,
-            )
-
-            return safe_render("fx.html", pairs=pairs, resultado=resultado, erro=None)
-
-        except Exception as e:
-            return safe_render("fx.html", pairs=pairs, resultado=None, erro=str(e))
-
-    @app.route("/ml/heart")
-    def ml_heart():
-        return safe_render("ml_heart.html", erro="(Em construção) A migrar para o novo app.")
-
-    @app.route("/nlp/supervised")
-    def nlp_supervised():
-        return safe_render("nlp_supervised.html", erro="(Em construção) A migrar para o novo app.")
-
-    @app.route("/loan")
-    def loan_form():
-        return safe_render("loan.html", erro="(Em construção) A migrar para o novo app.")
-
-    @app.route("/churn/xai")
-    def churn_xai_dashboard():
-        return safe_render("churn_xai.html", erro="(Em construção) A migrar para o novo app.")
-
-    # =========================
-    # WEATHER
-    # =========================
-    @app.route("/weather")
-    def weather():
-        city = (request.args.get("city") or WEATHER_DEFAULT_CITY).strip()
-        try:
-            days = int(request.args.get("days", 7))
-        except Exception:
-            days = 7
-        days = max(1, min(30, days))
-
-        units = request.args.get("units", "metric")
-        if units == "imperial":
-            temp_unit, wind_unit = "fahrenheit", "mph"
-        else:
-            units, temp_unit, wind_unit = "metric", "celsius", "kmh"
-
-        error, meta, chart = None, {}, None
-        try:
-            loc = service.geocode_city(city or WEATHER_DEFAULT_CITY, count=1, lang="pt")
-            if not loc:
-                raise RuntimeError("Cidade não encontrada. Tenta outro nome (ex.: 'Porto', 'Coimbra').")
-
-            meta = {
-                "city": f"{loc['name']}, {loc.get('country','')}".strip().strip(","),
-                "lat": loc["latitude"],
-                "lon": loc["longitude"],
-                "timezone": loc.get("timezone", "auto"),
-                "days": days,
-                "temp_unit": "°C" if temp_unit == "celsius" else "°F",
-                "wind_unit": "km/h" if wind_unit == "kmh" else wind_unit,
-            }
-
-            js = service.fetch_weather_forecast(
-                loc["latitude"], loc["longitude"], days, temp_unit, wind_unit, lang="pt"
-            )
-            daily = js.get("daily") or {}
-            dates = daily.get("time") or []
-            tmax = daily.get("temperature_2m_max") or []
-            tmin = daily.get("temperature_2m_min") or []
-            rain = daily.get("precipitation_sum") or []
-            wmax = daily.get("wind_speed_10m_max") or []
-
-            if not dates:
-                raise RuntimeError("Sem dados de previsão para este local.")
-
-            prob = [None] * len(dates)
-
-            chart = {
-                "labels": dates,
-                "tmax": [round(x, 2) if x is not None else None for x in tmax],
-                "tmin": [round(x, 2) if x is not None else None for x in tmin],
-                "rain": [round(x, 2) if x is not None else None for x in rain],
-                "wmax": [round(x, 2) if x is not None else None for x in wmax],
-                "prob": prob,
-            }
-        except Exception as e:
-            error = str(e)
-
-        return safe_render("weather.html", city=city, meta=meta, chart=chart, units=units, error=error)
-
-    @app.route("/weather.csv")
-    def weather_csv():
-        city = (request.args.get("city") or WEATHER_DEFAULT_CITY).strip()
-        try:
-            days = int(request.args.get("days", 7))
-        except Exception:
-            days = 7
-        days = max(1, min(30, days))
-
-        units = request.args.get("units", "metric")
-        temp_unit = "celsius" if units != "imperial" else "fahrenheit"
-        wind_unit = "kmh" if units != "imperial" else "mph"
-
-        loc = service.geocode_city(city or WEATHER_DEFAULT_CITY, count=1, lang="pt")
-        if not loc:
-            return make_response("Cidade não encontrada", 400)
-
-        js = service.fetch_weather_forecast(loc["latitude"], loc["longitude"], days, temp_unit, wind_unit, lang="pt")
-        daily = js.get("daily") or {}
-        df = pd.DataFrame({
-            "date": daily.get("time") or [],
-            "temp_max": daily.get("temperature_2m_max") or [],
-            "temp_min": daily.get("temperature_2m_min") or [],
-            "precipitation_mm": daily.get("precipitation_sum") or [],
-            "wind_speed_max": daily.get("wind_speed_10m_max") or [],
-        })
-        csv_buf = StringIO()
-        df.to_csv(csv_buf, index=False)
-
-        resp = make_response(csv_buf.getvalue())
-        resp.headers["Content-Type"] = "text/csv; charset=utf-8"
-        safe_city = (loc.get("name") or city).replace(" ", "_")
-        resp.headers["Content-Disposition"] = f"attachment; filename=weather_{safe_city}_{days}d.csv"
-        return resp
 
     # =========================
     # AMES
@@ -608,7 +390,6 @@ def create_app() -> Flask:
         )
 
     return app
-
 
 
 app = create_app()
