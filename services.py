@@ -1,6 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -8,6 +8,7 @@ from scipy import stats
 
 import plotly
 import plotly.express as px
+import plotly.graph_objects as go
 
 
 class PortfolioService:
@@ -15,9 +16,63 @@ class PortfolioService:
         self.timeout = timeout
         self.data_dir = Path(data_dir) if data_dir else None
 
-    # =========================
+    # ==========================================================
+    # Helpers (format / safety)
+    # ==========================================================
+    def _fmt_money(self, v: float, currency: str = "$") -> str:
+        """Executive-friendly money formatting: 1,234 -> $1,234 | 1.2M -> $1.2M"""
+        try:
+            if v is None or (isinstance(v, float) and np.isnan(v)):
+                return f"{currency}0"
+            v = float(v)
+        except Exception:
+            return f"{currency}0"
+
+        sign = "-" if v < 0 else ""
+        v_abs = abs(v)
+
+        if v_abs >= 1_000_000_000:
+            return f"{sign}{currency}{v_abs/1_000_000_000:.1f}B"
+        if v_abs >= 1_000_000:
+            return f"{sign}{currency}{v_abs/1_000_000:.1f}M"
+        if v_abs >= 1_000:
+            return f"{sign}{currency}{v_abs:,.0f}"
+        return f"{sign}{currency}{v_abs:.2f}"
+
+    def _fmt_int(self, v: float) -> str:
+        try:
+            return f"{int(round(float(v))):,}"
+        except Exception:
+            return "0"
+
+    def _fmt_pct(self, v: float, digits: int = 1) -> str:
+        try:
+            if v is None or (isinstance(v, float) and np.isnan(v)):
+                return "—"
+            return f"{float(v):.{digits}f}%"
+        except Exception:
+            return "—"
+
+    def _safe_to_datetime(self, s: pd.Series) -> pd.Series:
+        return pd.to_datetime(s, errors="coerce")
+
+    def _to_plotly_json(self, fig) -> str:
+        return plotly.io.to_json(fig, validate=False)
+
+    def _pick_first_existing_col(self, df: pd.DataFrame, candidates: List[str]) -> Optional[str]:
+        for c in candidates:
+            if c in df.columns:
+                return c
+        return None
+
+    def _empty_fig_json(self, title: str = "No data") -> str:
+        fig = px.scatter(pd.DataFrame({"x": [], "y": []}), x="x", y="y", title=title)
+        fig.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
+        return self._to_plotly_json(fig)
+
+    # ==========================================================
     # Ames (dataset + stats)
-    # =========================
+    # ==========================================================
     @lru_cache(maxsize=1)
     def load_ames_data(self) -> pd.DataFrame:
         if not self.data_dir:
@@ -29,6 +84,7 @@ class PortfolioService:
 
         df = pd.read_csv(csv_path)
 
+        # attempt numeric conversion for object columns (except known categoricals)
         for c in df.columns:
             if c in {"faixa_preco", "bairro", "Neighborhood"}:
                 continue
@@ -36,6 +92,11 @@ class PortfolioService:
                 converted = pd.to_numeric(df[c], errors="coerce")
                 if converted.notna().sum() > 0:
                     df[c] = converted
+
+        # normalize common important numeric cols if present
+        for c in ["preco", "preco_m2", "YearBuilt", "Year_Built", "year_built", "latitude", "lat", "longitude", "lon"]:
+            if c in df.columns:
+                df[c] = pd.to_numeric(df[c], errors="coerce")
 
         return df
 
@@ -113,6 +174,7 @@ class PortfolioService:
         resultados: Dict[str, Optional[float]] = {}
         s = serie.dropna()
 
+        # Jarque–Bera
         try:
             jb_stat, jb_p = stats.jarque_bera(s)
             resultados["jb_stat"] = float(jb_stat)
@@ -121,6 +183,7 @@ class PortfolioService:
             resultados["jb_stat"] = None
             resultados["jb_p"] = None
 
+        # Pearson with targets
         for alvo in ["preco", "preco_m2"]:
             r_key = f"corr_{alvo}_r"
             p_key = f"corr_{alvo}_p"
@@ -141,6 +204,7 @@ class PortfolioService:
                 resultados[r_key] = None
                 resultados[p_key] = None
 
+        # Spearman with price
         if "preco" in df_filtrado.columns and var in df_filtrado.columns and var != "preco":
             subset = df_filtrado[[var, "preco"]].dropna()
             if len(subset) >= 3:
@@ -158,6 +222,7 @@ class PortfolioService:
             resultados["corr_spearman_r"] = None
             resultados["corr_spearman_p"] = None
 
+        # Kruskal–Wallis by faixa_preco
         if df_completo is not None and "faixa_preco" in df_completo.columns and var in df_completo.columns:
             grupos = []
             for faixa in sorted(df_completo["faixa_preco"].dropna().unique().tolist()):
@@ -180,6 +245,7 @@ class PortfolioService:
             resultados["kruskal_H"] = None
             resultados["kruskal_p"] = None
 
+        # Simple linear regression: preco ~ var
         if "preco" in df_filtrado.columns and var in df_filtrado.columns and var != "preco":
             subset = df_filtrado[[var, "preco"]].dropna()
             if len(subset) >= 3:
@@ -207,9 +273,245 @@ class PortfolioService:
 
         return resultados
 
-    # =========================
+    def build_ames_dashboard_payload(
+        self,
+        df_full: pd.DataFrame,
+        variavel: str,
+        faixa_preco: str = "Todos",
+        max_heatmap_cols: int = 14,
+    ) -> Dict[str, Any]:
+        """
+        Builds everything the executive ames.html expects:
+        - estatisticas (1D stats)
+        - testes_extra (pearson/regression/kruskal/etc.)
+        - graph_*_json strings (or None if not available)
+        - df_filtrado used internally (optional)
+        """
+        if df_full is None or df_full.empty:
+            return {
+                "df_filtrado": pd.DataFrame(),
+                "estatisticas": self.calcular_estatisticas_1d(pd.Series(dtype=float)),
+                "testes_extra": {},
+                "graph_hist_json": self._empty_fig_json("No data"),
+                "graph_box_json": self._empty_fig_json("No data"),
+                "graph_scatter_json": None,
+                "graph_box_faixa_json": None,
+                "graph_preco_ano_json": None,
+                "graph_box_bairro_json": None,
+                "graph_bar_bairro_json": None,
+                "graph_heatmap_json": None,
+                "graph_map_json": None,
+            }
+
+        df = df_full.copy()
+
+        # filter by faixa_preco when available
+        if faixa_preco and faixa_preco != "Todos" and "faixa_preco" in df.columns:
+            df = df[df["faixa_preco"].astype(str) == str(faixa_preco)].copy()
+
+        # Ensure numeric driver
+        if variavel not in df.columns:
+            # fallback: first numeric col
+            num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+            variavel = num_cols[0] if num_cols else variavel
+
+        serie = pd.to_numeric(df.get(variavel, pd.Series(dtype=float)), errors="coerce")
+
+        estatisticas = self.calcular_estatisticas_1d(serie)
+        testes_extra = self.calcular_testes_adicionais(serie, df, variavel, df_full)
+
+        # ----------------------------
+        # Charts (executive)
+        # ----------------------------
+        # Histogram
+        fig_hist = px.histogram(
+            df.assign(_driver=serie),
+            x="_driver",
+            nbins=40,
+            title=f"Distribution — {variavel}",
+            labels={"_driver": variavel},
+        )
+        fig_hist.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
+
+        # Boxplot
+        fig_box = px.box(
+            df.assign(_driver=serie),
+            y="_driver",
+            title="Outliers and spread",
+            labels={"_driver": variavel},
+        )
+        fig_box.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
+
+        # Scatter: price vs driver (if preco exists)
+        graph_scatter_json = None
+        if "preco" in df.columns and variavel in df.columns and variavel != "preco":
+            tmp = df[[variavel, "preco"]].copy()
+            tmp[variavel] = pd.to_numeric(tmp[variavel], errors="coerce")
+            tmp["preco"] = pd.to_numeric(tmp["preco"], errors="coerce")
+            tmp = tmp.dropna()
+            if len(tmp) > 0:
+                tmp = tmp.head(6000)
+                fig_sc = px.scatter(
+                    tmp,
+                    x=variavel,
+                    y="preco",
+                    title=f"Price vs {variavel}",
+                    labels={variavel: variavel, "preco": "Price"},
+                    trendline="ols",
+                )
+                fig_sc.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
+                fig_sc.update_yaxes(tickprefix="$")
+                graph_scatter_json = self._to_plotly_json(fig_sc)
+
+        # Boxplot by price range (if faixa_preco exists and price exists)
+        graph_box_faixa_json = None
+        if "faixa_preco" in df_full.columns and variavel in df_full.columns:
+            tmp = df_full[[variavel, "faixa_preco"]].copy()
+            tmp[variavel] = pd.to_numeric(tmp[variavel], errors="coerce")
+            tmp["faixa_preco"] = tmp["faixa_preco"].astype(str)
+            tmp = tmp.dropna(subset=[variavel, "faixa_preco"])
+            if len(tmp) > 0:
+                fig_bf = px.box(
+                    tmp,
+                    x="faixa_preco",
+                    y=variavel,
+                    title=f"{variavel} by price segment",
+                    labels={"faixa_preco": "Price segment", variavel: variavel},
+                )
+                fig_bf.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
+                graph_box_faixa_json = self._to_plotly_json(fig_bf)
+
+        # Price vs Year Built (if possible)
+        graph_preco_ano_json = None
+        year_col = self._pick_first_existing_col(df, ["YearBuilt", "Year_Built", "year_built", "ano_construcao"])
+        if "preco" in df.columns and year_col is not None:
+            tmp = df[[year_col, "preco"]].copy()
+            tmp[year_col] = pd.to_numeric(tmp[year_col], errors="coerce")
+            tmp["preco"] = pd.to_numeric(tmp["preco"], errors="coerce")
+            tmp = tmp.dropna()
+            if len(tmp) > 0:
+                tmp = tmp[(tmp[year_col] >= 1800) & (tmp[year_col] <= 2100)].copy()
+                tmp = tmp.head(8000)
+                fig_y = px.scatter(
+                    tmp,
+                    x=year_col,
+                    y="preco",
+                    title="Price vs Year Built",
+                    labels={year_col: "Year Built", "preco": "Price"},
+                )
+                fig_y.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=520)
+                fig_y.update_yaxes(tickprefix="$")
+                graph_preco_ano_json = self._to_plotly_json(fig_y)
+
+        # Neighborhood comparison (boxplot of price by neighborhood)
+        graph_box_bairro_json = None
+        graph_bar_bairro_json = None
+        neigh_col = self._pick_first_existing_col(df_full, ["bairro", "Neighborhood", "neighborhood"])
+        if neigh_col is not None and "preco" in df_full.columns:
+            tmp = df_full[[neigh_col, "preco"]].copy()
+            tmp[neigh_col] = tmp[neigh_col].astype(str).str.strip()
+            tmp["preco"] = pd.to_numeric(tmp["preco"], errors="coerce")
+            tmp = tmp.dropna(subset=[neigh_col, "preco"])
+            tmp = tmp[tmp[neigh_col] != ""]
+            if len(tmp) > 0:
+                # keep top N neighborhoods by count for a clean executive view
+                counts = tmp[neigh_col].value_counts().head(25).index.tolist()
+                tmp2 = tmp[tmp[neigh_col].isin(counts)].copy()
+
+                fig_nb = px.box(
+                    tmp2,
+                    x=neigh_col,
+                    y="preco",
+                    title="Price distribution by neighborhood",
+                    labels={neigh_col: "Neighborhood", "preco": "Price"},
+                )
+                fig_nb.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=560)
+                fig_nb.update_yaxes(tickprefix="$")
+                fig_nb.update_xaxes(tickangle=45)
+                graph_box_bairro_json = self._to_plotly_json(fig_nb)
+
+                # bar: avg price top 20
+                avg = (
+                    tmp.groupby(neigh_col, as_index=False)["preco"]
+                    .mean()
+                    .sort_values("preco", ascending=False)
+                    .head(20)
+                )
+                fig_bar = px.bar(
+                    avg,
+                    x=neigh_col,
+                    y="preco",
+                    title="Average price ranking (Top 20)",
+                    labels={neigh_col: "Neighborhood", "preco": "Avg Price"},
+                )
+                fig_bar.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=560)
+                fig_bar.update_yaxes(tickprefix="$")
+                fig_bar.update_xaxes(tickangle=45)
+                graph_bar_bairro_json = self._to_plotly_json(fig_bar)
+
+        # Correlation heatmap (numeric columns only)
+        graph_heatmap_json = None
+        num_cols = df_full.select_dtypes(include=[np.number]).columns.tolist()
+        # prefer a small curated set if exists, else top N numeric
+        preferred = [c for c in ["preco", "preco_m2", "GrLivArea", "TotalBsmtSF", "GarageCars", "GarageArea", "OverallQual", "YearBuilt"] if c in num_cols]
+        cols = preferred if len(preferred) >= 4 else num_cols[:max_heatmap_cols]
+        cols = cols[:max_heatmap_cols]
+
+        if len(cols) >= 3:
+            corr = df_full[cols].corr(method="pearson")
+            fig_h = px.imshow(
+                corr,
+                text_auto=True,
+                aspect="auto",
+                title="Correlation matrix",
+            )
+            fig_h.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=620)
+            graph_heatmap_json = self._to_plotly_json(fig_h)
+
+        # Map (lat/lon)
+        graph_map_json = None
+        lat_col = self._pick_first_existing_col(df, ["latitude", "lat", "Latitude"])
+        lon_col = self._pick_first_existing_col(df, ["longitude", "lon", "Longitude"])
+        if lat_col and lon_col and lat_col in df.columns and lon_col in df.columns:
+            tmp = df[[lat_col, lon_col]].copy()
+            tmp[lat_col] = pd.to_numeric(tmp[lat_col], errors="coerce")
+            tmp[lon_col] = pd.to_numeric(tmp[lon_col], errors="coerce")
+            tmp = tmp.dropna()
+            if len(tmp) > 0:
+                tmp = tmp.head(8000)
+                fig_map = px.scatter_mapbox(
+                    tmp,
+                    lat=lat_col,
+                    lon=lon_col,
+                    zoom=10,
+                    height=520,
+                    title="Geographic distribution",
+                )
+                # open-street-map without token
+                fig_map.update_layout(
+                    mapbox_style="open-street-map",
+                    margin=dict(l=10, r=10, t=55, b=10),
+                )
+                graph_map_json = self._to_plotly_json(fig_map)
+
+        return {
+            "df_filtrado": df,
+            "estatisticas": estatisticas,
+            "testes_extra": testes_extra,
+            "graph_hist_json": self._to_plotly_json(fig_hist),
+            "graph_box_json": self._to_plotly_json(fig_box),
+            "graph_scatter_json": graph_scatter_json,
+            "graph_box_faixa_json": graph_box_faixa_json,
+            "graph_preco_ano_json": graph_preco_ano_json,
+            "graph_box_bairro_json": graph_box_bairro_json,
+            "graph_bar_bairro_json": graph_bar_bairro_json,
+            "graph_heatmap_json": graph_heatmap_json,
+            "graph_map_json": graph_map_json,
+        }
+
+    # ==========================================================
     # Walmart Sales
-    # =========================
+    # ==========================================================
     @lru_cache(maxsize=1)
     def load_walmart_data(self) -> pd.DataFrame:
         if not self.data_dir:
@@ -222,7 +524,8 @@ class PortfolioService:
         df = pd.read_csv(csv_path)
 
         # Parse date
-        df["transaction_date"] = pd.to_datetime(df["transaction_date"], errors="coerce")
+        if "transaction_date" in df.columns:
+            df["transaction_date"] = self._safe_to_datetime(df["transaction_date"])
 
         # Numerics
         for c in ["quantity_sold", "unit_price", "forecasted_demand", "actual_demand"]:
@@ -230,28 +533,31 @@ class PortfolioService:
                 df[c] = pd.to_numeric(df[c], errors="coerce")
 
         # Boolean normalization
-        if "promotion_applied" in df.columns:
-            df["promotion_applied"] = df["promotion_applied"].astype(str).str.lower().map(
+        def to_bool(col: str) -> None:
+            if col not in df.columns:
+                return
+            df[col] = df[col].astype(str).str.lower().map(
                 {"true": True, "false": False, "1": True, "0": False, "yes": True, "no": False}
             )
-            df["promotion_applied"] = df["promotion_applied"].fillna(False)
+            df[col] = df[col].fillna(False)
 
-        if "stockout_indicator" in df.columns:
-            df["stockout_indicator"] = df["stockout_indicator"].astype(str).str.lower().map(
-                {"true": True, "false": False, "1": True, "0": False, "yes": True, "no": False}
-            )
-            df["stockout_indicator"] = df["stockout_indicator"].fillna(False)
+        to_bool("promotion_applied")
+        to_bool("stockout_indicator")
 
         # Revenue
-        df["revenue"] = (df.get("quantity_sold", 0) * df.get("unit_price", 0)).astype(float)
+        q = df["quantity_sold"] if "quantity_sold" in df.columns else 0
+        p = df["unit_price"] if "unit_price" in df.columns else 0
+        df["revenue"] = (q * p).astype(float)
 
-        # Clean a few strings
+        # Clean strings
         for c in ["category", "store_location", "product_name", "payment_method", "customer_loyalty_level"]:
             if c in df.columns:
                 df[c] = df[c].astype(str).str.strip()
 
-        df = df.dropna(subset=["transaction_date"])  # keep rows with valid dates
-        df = df.sort_values("transaction_date")
+        # Keep valid dates
+        if "transaction_date" in df.columns:
+            df = df.dropna(subset=["transaction_date"])
+            df = df.sort_values("transaction_date")
 
         return df
 
@@ -281,8 +587,8 @@ class PortfolioService:
                 "n_categories": 0,
             }
 
-        date_min = df["transaction_date"].min()
-        date_max = df["transaction_date"].max()
+        date_min = df["transaction_date"].min() if "transaction_date" in df.columns else None
+        date_max = df["transaction_date"].max() if "transaction_date" in df.columns else None
 
         return {
             "n_rows": int(len(df)),
@@ -293,16 +599,17 @@ class PortfolioService:
         }
 
     def compute_sales_kpis(self, df: pd.DataFrame) -> Dict[str, str]:
+        """Executive KPIs (strings) for the dashboard."""
         if df is None or df.empty:
             return {
-                "revenue": "0.00",
+                "revenue": self._fmt_money(0.0),
                 "transactions": "0",
                 "units": "0",
-                "aov": "0.00",
+                "aov": self._fmt_money(0.0),
                 "promo_share": "0.0%",
                 "stockout_rate": "0.0%",
                 "mape": "—",
-                "avg_unit_price": "0.00",
+                "avg_unit_price": self._fmt_money(0.0),
             }
 
         revenue = float(df["revenue"].sum()) if "revenue" in df.columns else 0.0
@@ -313,14 +620,12 @@ class PortfolioService:
         promo_share = None
         if "promotion_applied" in df.columns and transactions > 0:
             promo_share = float(df["promotion_applied"].mean()) * 100.0
-        promo_share_str = f"{promo_share:.1f}%" if promo_share is not None else "—"
 
         stockout_rate = None
         if "stockout_indicator" in df.columns and transactions > 0:
             stockout_rate = float(df["stockout_indicator"].mean()) * 100.0
-        stockout_rate_str = f"{stockout_rate:.1f}%" if stockout_rate is not None else "—"
 
-        # MAPE (forecasted_demand vs actual_demand)
+        # Robust MAPE
         mape_str = "—"
         if "forecasted_demand" in df.columns and "actual_demand" in df.columns:
             sub = df[["forecasted_demand", "actual_demand"]].dropna()
@@ -333,24 +638,24 @@ class PortfolioService:
         avg_unit_price = float(df["unit_price"].mean()) if "unit_price" in df.columns else 0.0
 
         return {
-            "revenue": f"{revenue:,.2f}",
-            "transactions": f"{transactions:,}",
-            "units": f"{units:,.0f}",
-            "aov": f"{aov:,.2f}",
-            "promo_share": promo_share_str,
-            "stockout_rate": stockout_rate_str,
+            "revenue": self._fmt_money(revenue),
+            "transactions": self._fmt_int(transactions),
+            "units": self._fmt_int(units),
+            "aov": self._fmt_money(aov),
+            "promo_share": self._fmt_pct(promo_share, digits=1) if promo_share is not None else "—",
+            "stockout_rate": self._fmt_pct(stockout_rate, digits=1) if stockout_rate is not None else "—",
             "mape": mape_str,
-            "avg_unit_price": f"{avg_unit_price:,.2f}",
+            "avg_unit_price": self._fmt_money(avg_unit_price),
         }
 
-    def _to_plotly_json(self, fig) -> str:
-        return plotly.io.to_json(fig, validate=False)
-
     def build_sales_charts(self, df: pd.DataFrame, df_full: pd.DataFrame) -> Dict[str, str]:
-        # Ensure even if empty
+        """
+        Returns Plotly JSON for the charts used in sales.html.
+        Keeps your keys: rev_trend_json, rev_category_json, top_products_json, top_stores_json,
+        payment_mix_json, forecast_scatter_json.
+        """
         if df is None or df.empty:
-            # Create minimal empty charts
-            empty = px.scatter(pd.DataFrame({"x": [], "y": []}), x="x", y="y", title="No data")
+            empty = px.scatter(pd.DataFrame({"x": [], "y": []}), x="x", y="y", title="No data for current filters")
             js = self._to_plotly_json(empty)
             return {
                 "rev_trend_json": js,
@@ -363,69 +668,129 @@ class PortfolioService:
 
         d = df.copy()
 
+        # --------------------------------------------------
         # Revenue trend (monthly)
+        # --------------------------------------------------
         d["month"] = d["transaction_date"].dt.to_period("M").dt.to_timestamp()
         rev_m = d.groupby("month", as_index=False)["revenue"].sum()
 
         fig_trend = px.line(
-            rev_m, x="month", y="revenue",
+            rev_m,
+            x="month",
+            y="revenue",
             title="Revenue trend",
-            labels={"month": "Month", "revenue": "Revenue"}
+            labels={"month": "Month", "revenue": "Revenue"},
         )
-        fig_trend.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=420)
+        fig_trend.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
+        fig_trend.update_yaxes(tickprefix="$")
 
+        # --------------------------------------------------
         # Revenue by category
+        # --------------------------------------------------
         if "category" in d.columns:
-            rev_cat = d.groupby("category", as_index=False)["revenue"].sum().sort_values("revenue", ascending=False)
+            rev_cat = (
+                d.groupby("category", as_index=False)["revenue"]
+                .sum()
+                .sort_values("revenue", ascending=False)
+            )
             fig_cat = px.bar(
                 rev_cat.head(12),
-                x="category", y="revenue",
+                x="category",
+                y="revenue",
                 title="Revenue by category",
-                labels={"category": "Category", "revenue": "Revenue"}
+                labels={"category": "Category", "revenue": "Revenue"},
             )
-            fig_cat.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=420)
+            fig_cat.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
+            fig_cat.update_yaxes(tickprefix="$")
         else:
-            fig_cat = px.bar(pd.DataFrame({"category": [], "revenue": []}), x="category", y="revenue", title="Revenue by category")
+            fig_cat = px.bar(
+                pd.DataFrame({"category": [], "revenue": []}),
+                x="category",
+                y="revenue",
+                title="Revenue by category",
+            )
 
-        # Top products
+        # --------------------------------------------------
+        # Top products (revenue)
+        # --------------------------------------------------
         if "product_name" in d.columns:
-            top_p = d.groupby("product_name", as_index=False)["revenue"].sum().sort_values("revenue", ascending=False).head(12)
+            top_p = (
+                d.groupby("product_name", as_index=False)["revenue"]
+                .sum()
+                .sort_values("revenue", ascending=False)
+                .head(12)
+            )
             fig_top_p = px.bar(
                 top_p,
-                x="revenue", y="product_name",
+                x="revenue",
+                y="product_name",
                 orientation="h",
                 title="Top products (revenue)",
-                labels={"product_name": "Product", "revenue": "Revenue"}
+                labels={"product_name": "Product", "revenue": "Revenue"},
             )
-            fig_top_p.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=420)
+            fig_top_p.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
+            fig_top_p.update_xaxes(tickprefix="$")
         else:
-            fig_top_p = px.bar(pd.DataFrame({"product_name": [], "revenue": []}), x="revenue", y="product_name", title="Top products")
+            fig_top_p = px.bar(
+                pd.DataFrame({"product_name": [], "revenue": []}),
+                x="revenue",
+                y="product_name",
+                title="Top products",
+            )
 
-        # Top stores
+        # --------------------------------------------------
+        # Top stores (revenue)
+        # --------------------------------------------------
         if "store_location" in d.columns:
-            top_s = d.groupby("store_location", as_index=False)["revenue"].sum().sort_values("revenue", ascending=False).head(10)
+            top_s = (
+                d.groupby("store_location", as_index=False)["revenue"]
+                .sum()
+                .sort_values("revenue", ascending=False)
+                .head(10)
+            )
             fig_top_s = px.bar(
                 top_s,
-                x="store_location", y="revenue",
+                x="store_location",
+                y="revenue",
                 title="Top stores (revenue)",
-                labels={"store_location": "Store", "revenue": "Revenue"}
+                labels={"store_location": "Store", "revenue": "Revenue"},
             )
-            fig_top_s.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=420)
+            fig_top_s.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
+            fig_top_s.update_yaxes(tickprefix="$")
         else:
-            fig_top_s = px.bar(pd.DataFrame({"store_location": [], "revenue": []}), x="store_location", y="revenue", title="Top stores")
+            fig_top_s = px.bar(
+                pd.DataFrame({"store_location": [], "revenue": []}),
+                x="store_location",
+                y="revenue",
+                title="Top stores",
+            )
 
-        # Payment mix
+        # --------------------------------------------------
+        # Payment mix (revenue)
+        # --------------------------------------------------
         if "payment_method" in d.columns:
-            pay = d.groupby("payment_method", as_index=False)["revenue"].sum().sort_values("revenue", ascending=False)
+            pay = (
+                d.groupby("payment_method", as_index=False)["revenue"]
+                .sum()
+                .sort_values("revenue", ascending=False)
+            )
             fig_pay = px.pie(pay, names="payment_method", values="revenue", title="Payment mix (revenue)")
-            fig_pay.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=420)
+            fig_pay.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
         else:
-            fig_pay = px.pie(pd.DataFrame({"payment_method": [], "revenue": []}), names="payment_method", values="revenue", title="Payment mix")
+            fig_pay = px.pie(
+                pd.DataFrame({"payment_method": [], "revenue": []}),
+                names="payment_method",
+                values="revenue",
+                title="Payment mix",
+            )
 
-        # Forecast vs actual
+        # --------------------------------------------------
+        # Forecast vs actual demand (scatter + y=x line)
+        # --------------------------------------------------
         if "forecasted_demand" in d.columns and "actual_demand" in d.columns:
-            sub = d[["forecasted_demand", "actual_demand", "store_location"]].dropna()
-            sub = sub.head(4000)  # limit
+            sub = d[["forecasted_demand", "actual_demand"]].dropna()
+            sub = sub.head(4000)
+
             fig_fc = px.scatter(
                 sub,
                 x="forecasted_demand",
@@ -433,9 +798,28 @@ class PortfolioService:
                 title="Forecast vs actual demand",
                 labels={"forecasted_demand": "Forecasted", "actual_demand": "Actual"},
             )
-            fig_fc.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=420)
+            fig_fc.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
+
+            if len(sub) > 0:
+                mn = float(np.nanmin([sub["forecasted_demand"].min(), sub["actual_demand"].min()]))
+                mx = float(np.nanmax([sub["forecasted_demand"].max(), sub["actual_demand"].max()]))
+                fig_fc.add_trace(
+                    go.Scatter(
+                        x=[mn, mx],
+                        y=[mn, mx],
+                        mode="lines",
+                        name="Ideal (y = x)",
+                        line=dict(dash="dash"),
+                        showlegend=True,
+                    )
+                )
         else:
-            fig_fc = px.scatter(pd.DataFrame({"forecasted_demand": [], "actual_demand": []}), x="forecasted_demand", y="actual_demand", title="Forecast vs actual")
+            fig_fc = px.scatter(
+                pd.DataFrame({"forecasted_demand": [], "actual_demand": []}),
+                x="forecasted_demand",
+                y="actual_demand",
+                title="Forecast vs actual demand",
+            )
 
         return {
             "rev_trend_json": self._to_plotly_json(fig_trend),
@@ -447,12 +831,20 @@ class PortfolioService:
         }
 
     def build_store_comparison(self, df_a: pd.DataFrame, df_b: pd.DataFrame, store_a: str, store_b: str) -> Dict[str, Any]:
+        """
+        Store A vs Store B comparison payload:
+        - KPI blocks for each store
+        - Category comparison grouped bar
+        - Trend comparison line
+        """
+        df_a = df_a if df_a is not None else pd.DataFrame()
+        df_b = df_b if df_b is not None else pd.DataFrame()
+
         kpi_a = self.compute_sales_kpis(df_a)
         kpi_b = self.compute_sales_kpis(df_b)
 
-        # Category compare
         def cat_rev(d: pd.DataFrame, label: str) -> pd.DataFrame:
-            if d.empty or "category" not in d.columns:
+            if d.empty or "category" not in d.columns or "revenue" not in d.columns:
                 return pd.DataFrame({"category": [], "revenue": [], "store": []})
             tmp = d.groupby("category", as_index=False)["revenue"].sum()
             tmp["store"] = label
@@ -461,8 +853,17 @@ class PortfolioService:
         ca = cat_rev(df_a, store_a)
         cb = cat_rev(df_b, store_b)
         cat = pd.concat([ca, cb], ignore_index=True)
+
         if not cat.empty:
-            cat = cat.sort_values("revenue", ascending=False)
+            top = (
+                cat.groupby("category", as_index=False)["revenue"]
+                .sum()
+                .sort_values("revenue", ascending=False)
+                .head(12)["category"]
+                .tolist()
+            )
+            cat = cat[cat["category"].isin(top)].copy()
+
         fig_cat_cmp = px.bar(
             cat,
             x="category",
@@ -470,13 +871,13 @@ class PortfolioService:
             color="store",
             barmode="group",
             title="Revenue by category (Store A vs Store B)",
-            labels={"category": "Category", "revenue": "Revenue", "store": "Store"}
+            labels={"category": "Category", "revenue": "Revenue", "store": "Store"},
         )
-        fig_cat_cmp.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=420)
+        fig_cat_cmp.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
+        fig_cat_cmp.update_yaxes(tickprefix="$")
 
-        # Trend compare
         def monthly(d: pd.DataFrame, label: str) -> pd.DataFrame:
-            if d.empty:
+            if d.empty or "transaction_date" not in d.columns or "revenue" not in d.columns:
                 return pd.DataFrame({"month": [], "revenue": [], "store": []})
             x = d.copy()
             x["month"] = x["transaction_date"].dt.to_period("M").dt.to_timestamp()
@@ -487,21 +888,23 @@ class PortfolioService:
         ta = monthly(df_a, store_a)
         tb = monthly(df_b, store_b)
         t = pd.concat([ta, tb], ignore_index=True)
+
         fig_trend_cmp = px.line(
             t,
             x="month",
             y="revenue",
             color="store",
             title="Revenue trend (Store A vs Store B)",
-            labels={"month": "Month", "revenue": "Revenue", "store": "Store"}
+            labels={"month": "Month", "revenue": "Revenue", "store": "Store"},
         )
-        fig_trend_cmp.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=420)
+        fig_trend_cmp.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
+        fig_trend_cmp.update_yaxes(tickprefix="$")
 
         return {
             "store_a": store_a,
             "store_b": store_b,
             "kpi_a": kpi_a,
             "kpi_b": kpi_b,
-            "cat_compare_json": plotly.io.to_json(fig_cat_cmp, validate=False),
-            "trend_compare_json": plotly.io.to_json(fig_trend_cmp, validate=False),
+            "cat_compare_json": self._to_plotly_json(fig_cat_cmp),
+            "trend_compare_json": self._to_plotly_json(fig_trend_cmp),
         }
