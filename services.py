@@ -5,6 +5,7 @@ from datetime import datetime
 
 import io
 import re
+import csv
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -91,6 +92,7 @@ class PortfolioService:
 
         df = pd.read_csv(csv_path)
 
+        # attempt numeric conversion for object columns (except known categoricals)
         for c in df.columns:
             if c in {"faixa_preco", "bairro", "Neighborhood"}:
                 continue
@@ -99,6 +101,7 @@ class PortfolioService:
                 if converted.notna().sum() > 0:
                     df[c] = converted
 
+        # normalize common important numeric cols if present
         for c in ["preco", "preco_m2", "YearBuilt", "Year_Built", "year_built", "latitude", "lat", "longitude", "lon"]:
             if c in df.columns:
                 df[c] = pd.to_numeric(df[c], errors="coerce")
@@ -179,6 +182,7 @@ class PortfolioService:
         resultados: Dict[str, Optional[float]] = {}
         s = serie.dropna()
 
+        # Jarque–Bera
         try:
             jb_stat, jb_p = stats.jarque_bera(s)
             resultados["jb_stat"] = float(jb_stat)
@@ -187,6 +191,7 @@ class PortfolioService:
             resultados["jb_stat"] = None
             resultados["jb_p"] = None
 
+        # Pearson with targets
         for alvo in ["preco", "preco_m2"]:
             r_key = f"corr_{alvo}_r"
             p_key = f"corr_{alvo}_p"
@@ -207,6 +212,7 @@ class PortfolioService:
                 resultados[r_key] = None
                 resultados[p_key] = None
 
+        # Spearman with price
         if "preco" in df_filtrado.columns and var in df_filtrado.columns and var != "preco":
             subset = df_filtrado[[var, "preco"]].dropna()
             if len(subset) >= 3:
@@ -224,6 +230,7 @@ class PortfolioService:
             resultados["corr_spearman_r"] = None
             resultados["corr_spearman_p"] = None
 
+        # Kruskal–Wallis by faixa_preco
         if df_completo is not None and "faixa_preco" in df_completo.columns and var in df_completo.columns:
             grupos = []
             for faixa in sorted(df_completo["faixa_preco"].dropna().unique().tolist()):
@@ -246,6 +253,7 @@ class PortfolioService:
             resultados["kruskal_H"] = None
             resultados["kruskal_p"] = None
 
+        # Simple linear regression: preco ~ var
         if "preco" in df_filtrado.columns and var in df_filtrado.columns and var != "preco":
             subset = df_filtrado[[var, "preco"]].dropna()
             if len(subset) >= 3:
@@ -629,6 +637,7 @@ class PortfolioService:
             }
 
         d = df.copy()
+
         d["month"] = d["transaction_date"].dt.to_period("M").dt.to_timestamp()
         rev_m = d.groupby("month", as_index=False)["revenue"].sum()
 
@@ -658,12 +667,7 @@ class PortfolioService:
             fig_cat.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
             fig_cat.update_yaxes(tickprefix="$")
         else:
-            fig_cat = px.bar(
-                pd.DataFrame({"category": [], "revenue": []}),
-                x="category",
-                y="revenue",
-                title="Revenue by category",
-            )
+            fig_cat = px.bar(pd.DataFrame({"category": [], "revenue": []}), x="category", y="revenue", title="Revenue by category")
 
         if "product_name" in d.columns:
             top_p = (
@@ -683,12 +687,7 @@ class PortfolioService:
             fig_top_p.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
             fig_top_p.update_xaxes(tickprefix="$")
         else:
-            fig_top_p = px.bar(
-                pd.DataFrame({"product_name": [], "revenue": []}),
-                x="revenue",
-                y="product_name",
-                title="Top products",
-            )
+            fig_top_p = px.bar(pd.DataFrame({"product_name": [], "revenue": []}), x="revenue", y="product_name", title="Top products")
 
         if "store_location" in d.columns:
             top_s = (
@@ -707,12 +706,7 @@ class PortfolioService:
             fig_top_s.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
             fig_top_s.update_yaxes(tickprefix="$")
         else:
-            fig_top_s = px.bar(
-                pd.DataFrame({"store_location": [], "revenue": []}),
-                x="store_location",
-                y="revenue",
-                title="Top stores",
-            )
+            fig_top_s = px.bar(pd.DataFrame({"store_location": [], "revenue": []}), x="store_location", y="revenue", title="Top stores")
 
         if "payment_method" in d.columns:
             pay = (
@@ -723,16 +717,10 @@ class PortfolioService:
             fig_pay = px.pie(pay, names="payment_method", values="revenue", title="Payment mix (revenue)")
             fig_pay.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
         else:
-            fig_pay = px.pie(
-                pd.DataFrame({"payment_method": [], "revenue": []}),
-                names="payment_method",
-                values="revenue",
-                title="Payment mix",
-            )
+            fig_pay = px.pie(pd.DataFrame({"payment_method": [], "revenue": []}), names="payment_method", values="revenue", title="Payment mix")
 
         if "forecasted_demand" in d.columns and "actual_demand" in d.columns:
-            sub = d[["forecasted_demand", "actual_demand"]].dropna()
-            sub = sub.head(4000)
+            sub = d[["forecasted_demand", "actual_demand"]].dropna().head(4000)
 
             fig_fc = px.scatter(
                 sub,
@@ -847,7 +835,7 @@ class PortfolioService:
         }
 
     # ==========================================================
-    # ✅ NEW: Data Cleaner & Quality Report
+    # ✅ Data Cleaner & Quality Report (FIX CSV WITH DECIMAL COMMA)
     # ==========================================================
     def read_uploaded_dataset(self, file_storage) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         filename = (file_storage.filename or "").strip()
@@ -859,144 +847,217 @@ class PortfolioService:
         if not content:
             raise ValueError("Uploaded file is empty.")
 
-        bio = io.BytesIO(content)
+        meta = {"filename": filename, "ext": ext}
 
-        if ext in {"csv", "txt"}:
-            try:
-                df = pd.read_csv(bio, sep=None, engine="python")
-            except Exception:
-                bio.seek(0)
-                df = pd.read_csv(bio, sep=None, engine="python", encoding="latin-1")
-        elif ext in {"xlsx", "xls"}:
+        if ext in {"xlsx", "xls"}:
+            bio = io.BytesIO(content)
             df = pd.read_excel(bio)
-        else:
+            meta.update({"rows": int(len(df)), "cols": int(df.shape[1])})
+            return df, meta
+
+        if ext not in {"csv", "txt"}:
             raise ValueError("Unsupported file type. Please upload CSV or Excel (xlsx/xls).")
 
-        meta = {
-            "filename": filename,
-            "ext": ext,
-            "rows": int(len(df)),
-            "cols": int(df.shape[1]),
-        }
+        # ----------------------------
+        # Robust CSV reading:
+        # - Handles "decimal comma" values that would break comma-delimited files
+        # - Reconstruct rows to match header column count
+        # ----------------------------
+        text = None
+        for enc in ("utf-8-sig", "utf-8", "latin-1"):
+            try:
+                text = content.decode(enc)
+                break
+            except Exception:
+                continue
+        if text is None:
+            text = content.decode("latin-1", errors="replace")
+
+        lines = [ln.strip("\n\r") for ln in text.splitlines() if ln.strip("\n\r").strip() != ""]
+        if len(lines) < 2:
+            raise ValueError("CSV has no data rows.")
+
+        # Use csv.reader with delimiter comma; then we repair rows with extra columns
+        header_raw = next(csv.reader([lines[0]], delimiter=",", skipinitialspace=True))
+        header = [h.strip() for h in header_raw]
+        n_cols = len(header)
+
+        # Identify "money-like" columns by header name (where decimal-comma is common)
+        money_idx = []
+        for i, h in enumerate(header):
+            h_low = h.lower()
+            if any(k in h_low for k in ["€", "eur", "price", "amount", "spend", "total", "valor", "preço", "preco", "custo", "revenue"]):
+                money_idx.append(i)
+
+        def is_int_token(tok: str) -> bool:
+            t = (tok or "").strip()
+            return bool(re.fullmatch(r"\d+", t))
+
+        def is_thousand_token(tok: str) -> bool:
+            t = (tok or "").strip()
+            return bool(re.fullmatch(r"\d{1,3}(\.\d{3})+", t))  # 1.234 or 12.345.678
+
+        def is_decimal_token(tok: str) -> bool:
+            t = (tok or "").strip()
+            return bool(re.fullmatch(r"\d{1,2}", t))  # 50 (cents) / 7 etc.
+
+        def repair_row(parts: List[str]) -> List[str]:
+            # Trim
+            parts = [p.strip() for p in parts]
+
+            # If too many columns: try merge likely numeric splits in money columns
+            while len(parts) > n_cols:
+                merged = False
+
+                # Try fix decimal comma: "1.234", "50" -> "1.234,50"
+                for j in money_idx:
+                    if j < len(parts) - 1 and len(parts) > n_cols:
+                        if (is_thousand_token(parts[j]) or is_int_token(parts[j])) and is_decimal_token(parts[j + 1]):
+                            parts[j] = f"{parts[j]},{parts[j+1]}"
+                            del parts[j + 1]
+                            merged = True
+                            break
+
+                if merged:
+                    continue
+
+                # Try fix "2", "450.75" -> "2,450.75" (comma thousand)
+                for j in money_idx:
+                    if j < len(parts) - 1 and len(parts) > n_cols:
+                        if is_int_token(parts[j]) and bool(re.fullmatch(r"\d+\.\d+", (parts[j + 1] or "").strip())):
+                            parts[j] = f"{parts[j]},{parts[j+1]}"
+                            del parts[j + 1]
+                            merged = True
+                            break
+
+                if merged:
+                    continue
+
+                # Fallback: merge the last two tokens (better than shifting columns)
+                parts[-2] = f"{parts[-2]},{parts[-1]}"
+                parts = parts[:-1]
+
+            # If too few columns: pad
+            if len(parts) < n_cols:
+                parts = parts + [""] * (n_cols - len(parts))
+
+            # If still not exact, truncate
+            return parts[:n_cols]
+
+        rows = []
+        for ln in lines[1:]:
+            parts = next(csv.reader([ln], delimiter=",", skipinitialspace=True))
+            parts = repair_row(parts)
+            rows.append(parts)
+
+        df = pd.DataFrame(rows, columns=header)
+        meta.update({"rows": int(len(df)), "cols": int(df.shape[1])})
         return df, meta
 
     def _normalize_colname(self, c: str) -> str:
         c0 = str(c).strip()
         c0 = re.sub(r"\s+", " ", c0)
         c1 = c0.lower()
-        c1 = re.sub(r"[^\w\s]", "", c1)
-        c1 = re.sub(r"\s+", "_", c1)
+        c1 = re.sub(r"[^\w\s]", "", c1)        # remove punctuation
+        c1 = re.sub(r"\s+", "_", c1)           # spaces -> underscore
         c1 = re.sub(r"_+", "_", c1).strip("_")
         return c1 if c1 else "col"
 
-    def _parse_numeric_series(self, s: pd.Series) -> pd.Series:
+    def _parse_mixed_number(self, s: pd.Series) -> pd.Series:
         """
-        Robust numeric parsing for messy real-world strings:
-        - handles 1.234,50 and 1,234.50
-        - handles currency symbols and spaces
-        - chooses decimal separator by the last occurrence of ',' or '.'
+        Converts common PT/EN number formats safely:
+        - "1.234,50" -> 1234.50
+        - "1,234.50" -> 1234.50
+        - "845.00" -> 845.00
+        - "2,450.75" -> 2450.75
         """
-        def parse_one(x: str) -> str:
-            x = str(x).strip()
-            if x == "":
-                return ""
-            x = x.replace("\u00A0", " ")  # non-breaking space
-            x = re.sub(r"[€$£]", "", x)
-            x = x.replace(" ", "")
+        if s is None:
+            return s
 
-            # negatives like (123,45)
-            neg = False
-            if x.startswith("(") and x.endswith(")"):
-                neg = True
-                x = x[1:-1].strip()
+        x = s.astype(str).str.strip()
+        x = x.replace({"": np.nan, "nan": np.nan, "None": np.nan, "none": np.nan, "null": np.nan, "NULL": np.nan})
 
-            # keep only digits, comma, dot, minus
-            x = re.sub(r"[^0-9,\.\-]", "", x)
+        def conv_one(v: str):
+            if v is None or (isinstance(v, float) and np.isnan(v)):
+                return np.nan
+            t = str(v).strip()
+            if t == "":
+                return np.nan
 
-            if "," in x and "." in x:
-                # decimal separator = whichever appears last
-                if x.rfind(",") > x.rfind("."):
-                    # EU style: 1.234,56 => 1234.56
-                    x = x.replace(".", "")
-                    x = x.replace(",", ".")
+            # keep only digits, dot, comma, minus
+            t = re.sub(r"[^\d\-,\.]", "", t)
+
+            # Case A: contains both comma and dot
+            if "," in t and "." in t:
+                # Decide decimal by last separator
+                if t.rfind(",") > t.rfind("."):
+                    # "1.234,50" -> remove dots (thousands), comma -> dot
+                    t2 = t.replace(".", "").replace(",", ".")
                 else:
-                    # US style: 1,234.56 => 1234.56
-                    x = x.replace(",", "")
-            elif "," in x and "." not in x:
-                # likely EU decimal
-                x = x.replace(",", ".")
-            # else only dot or only digits -> ok
+                    # "1,234.50" -> remove commas (thousands)
+                    t2 = t.replace(",", "")
+                try:
+                    return float(t2)
+                except Exception:
+                    return np.nan
 
-            if neg and x and x[0] != "-":
-                x = "-" + x
-            return x
+            # Case B: only comma => assume decimal comma
+            if "," in t and "." not in t:
+                # Could be "1234,50" or "2,450" (ambiguous). Use heuristic:
+                # if last group has 1-2 digits => decimal comma
+                if re.fullmatch(r"-?\d+,\d{1,2}", t):
+                    t2 = t.replace(",", ".")
+                else:
+                    # treat as thousand sep
+                    t2 = t.replace(",", "")
+                try:
+                    return float(t2)
+                except Exception:
+                    return np.nan
 
-        out = s.astype(str).map(parse_one)
-        return pd.to_numeric(out, errors="coerce")
+            # Case C: only dot => standard float
+            if "." in t and "," not in t:
+                # Could be "1.234" thousand or "845.00" decimal
+                # If pattern matches thousand grouping, remove dots
+                if re.fullmatch(r"-?\d{1,3}(\.\d{3})+", t):
+                    t2 = t.replace(".", "")
+                else:
+                    t2 = t
+                try:
+                    return float(t2)
+                except Exception:
+                    return np.nan
 
-    def _should_convert_numeric(self, s: pd.Series, threshold: float = 0.75) -> bool:
-        s2 = s.dropna().astype(str)
-        if len(s2) == 0:
-            return False
-        sample = s2.head(300)
-        parsed = self._parse_numeric_series(sample)
-        return float(parsed.notna().mean()) >= threshold
+            # Case D: digits only
+            if re.fullmatch(r"-?\d+", t):
+                try:
+                    return float(t)
+                except Exception:
+                    return np.nan
 
-    def _best_datetime_parse(self, s: pd.Series, threshold: float = 0.70) -> Optional[Tuple[bool, float]]:
-        """
-        Try dayfirst False and True, choose the best parse ratio.
-        Returns (dayfirst, ratio) if good enough else None.
-        """
-        s2 = s.dropna().astype(str)
-        if len(s2) == 0:
-            return None
-        sample = s2.head(300)
+            return np.nan
 
-        p1 = pd.to_datetime(sample, errors="coerce", dayfirst=False)
-        r1 = float(p1.notna().mean())
-
-        p2 = pd.to_datetime(sample, errors="coerce", dayfirst=True)
-        r2 = float(p2.notna().mean())
-
-        best_dayfirst, best_ratio = (False, r1) if r1 >= r2 else (True, r2)
-        if best_ratio >= threshold:
-            return best_dayfirst, best_ratio
-        return None
-
-    def _pick_id_column(self, df: pd.DataFrame) -> Optional[str]:
-        """
-        Choose an ID-like column for safer dedup if it exists.
-        Preference: exact 'id', then '*_id'.
-        """
-        cols = df.columns.tolist()
-        if "id" in cols:
-            return "id"
-        candidates = [c for c in cols if c.endswith("_id")]
-        if candidates:
-            # pick the one with lowest unique ratio? keep simple:
-            return candidates[0]
-        return None
+        return x.map(conv_one)
 
     def clean_dataframe(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         """
         Opinionated cleaning:
         - trim strings
         - normalize column names
-        - drop fully empty rows/cols
-        - convert numeric-like strings (robust EU/US)
-        - parse datetime-like columns (best of dayfirst True/False)
-        - remove duplicates (full row + optional *_id)
+        - drop fully empty rows/cols (ONLY fully empty)
+        - convert numeric-like strings (handles PT/EN formats)
+        - parse datetime-like columns (heuristic)
+        - remove duplicates
         """
         if df is None or df.empty:
             return df, {"note": "empty_df"}
 
         original = df.copy()
 
-        # 1) Drop fully empty rows/cols (SAFE: does NOT drop partial rows)
-        df = df.dropna(axis=0, how="all")
-        df = df.dropna(axis=1, how="all")
+        # 1) Drop fully empty rows/cols (does NOT remove rows with partial missing)
+        df = df.dropna(axis=0, how="all").dropna(axis=1, how="all")
 
-        # 2) Normalize column names (unique)
+        # 2) Normalize col names (and keep uniqueness)
         new_cols = [self._normalize_colname(c) for c in df.columns]
         seen = {}
         unique_cols = []
@@ -1007,55 +1068,60 @@ class PortfolioService:
             else:
                 seen[c] += 1
                 unique_cols.append(f"{c}_{seen[c]}")
-        df = df.rename(columns=dict(zip(df.columns.tolist(), unique_cols)))
+        col_map = dict(zip(df.columns.tolist(), unique_cols))
+        df = df.rename(columns=col_map)
 
-        # 3) Trim strings & standardize null-likes
-        null_like = {"", "nan", "none", "null", "n/a", "na", "NaN", "NULL", "None"}
+        # 3) Trim strings + normalize nulls
         for c in df.columns:
             if df[c].dtype == object:
                 df[c] = df[c].astype(str).str.strip()
-                df.loc[df[c].isin(null_like), c] = np.nan
+                df.loc[df[c].isin(["", "nan", "none", "null", "NaN", "NULL"]), c] = np.nan
 
-        # 4) Convert numeric-like columns (robust)
+        # 4) Convert numeric-like strings (robust PT/EN)
         for c in df.columns:
             if df[c].dtype == object:
-                if self._should_convert_numeric(df[c]):
-                    df[c] = self._parse_numeric_series(df[c])
+                s0 = df[c].dropna()
+                if len(s0) == 0:
+                    continue
+                sample = s0.head(200).astype(str)
 
-        # 5) Datetime heuristic (best parse)
+                # quick "looks numeric" score:
+                # allow digits, spaces, dot, comma, minus, currency
+                cleaned = sample.str.replace(r"[^\d\-,\.]", "", regex=True)
+                looks = cleaned.str.match(r"^-?[\d\.,]+$").mean()
+
+                if looks >= 0.80:
+                    parsed = self._parse_mixed_number(df[c])
+                    # only accept conversion if it doesn't destroy too many values
+                    if parsed.notna().mean() >= 0.60:
+                        df[c] = parsed
+
+        # 5) Datetime heuristic (only if many parse)
         for c in df.columns:
             if df[c].dtype == object:
-                best = self._best_datetime_parse(df[c])
-                if best is not None:
-                    dayfirst, _ratio = best
-                    df[c] = pd.to_datetime(df[c], errors="coerce", dayfirst=dayfirst)
+                s = df[c].dropna().astype(str)
+                if len(s) == 0:
+                    continue
+                sample = s.head(200)
+
+                # Try both dayfirst False and True; pick best
+                p1 = pd.to_datetime(sample, errors="coerce", dayfirst=False)
+                p2 = pd.to_datetime(sample, errors="coerce", dayfirst=True)
+
+                best = p1 if p1.notna().mean() >= p2.notna().mean() else p2
+                best_dayfirst = False if best is p1 else True
+
+                if best.notna().mean() >= 0.70:
+                    df[c] = pd.to_datetime(df[c], errors="coerce", dayfirst=best_dayfirst)
 
         # 6) Remove duplicates
-        before = len(df)
+        before_dups = len(df)
         df = df.drop_duplicates()
-        removed_full_row = before - len(df)
-
-        # 6b) Optional: remove duplicates by an ID-like column (safer than guessing)
-        removed_by_id = 0
-        id_col = self._pick_id_column(df)
-        if id_col is not None and id_col in df.columns:
-            # if duplicates exist in id_col, dedup keeping first
-            dup_mask = df[id_col].duplicated(keep="first")
-            if bool(dup_mask.any()):
-                before_id = len(df)
-                df = df[~dup_mask].copy()
-                removed_by_id = before_id - len(df)
-
-        removed_dups = int(removed_full_row + removed_by_id)
+        removed_dups = before_dups - len(df)
 
         df = df.reset_index(drop=True)
 
         report = self.build_data_quality_report(original, df, removed_dups)
-        # extra details (useful, but optional for UI)
-        report["removed_duplicates_full_row"] = int(removed_full_row)
-        report["removed_duplicates_by_id"] = int(removed_by_id)
-        report["id_dedup_column"] = id_col if removed_by_id > 0 else None
-
         return df, report
 
     def build_data_quality_report(self, df_raw: pd.DataFrame, df_clean: pd.DataFrame, removed_dups: int) -> Dict[str, Any]:
@@ -1130,14 +1196,7 @@ class PortfolioService:
         line("Shape & completeness", bold=True)
         line(f"Raw rows/cols: {report.get('raw_rows', 0)} / {report.get('raw_cols', 0)}")
         line(f"Clean rows/cols: {report.get('clean_rows', 0)} / {report.get('clean_cols', 0)}")
-        line(f"Removed duplicates (total): {report.get('removed_duplicates', 0)}")
-
-        # extra duplicate details if present
-        if report.get("removed_duplicates_by_id", 0) > 0:
-            line(f" - by ID column ({report.get('id_dedup_column')}): {report.get('removed_duplicates_by_id')}", size=10)
-        if report.get("removed_duplicates_full_row", 0) > 0:
-            line(f" - identical rows: {report.get('removed_duplicates_full_row')}", size=10)
-
+        line(f"Removed duplicates: {report.get('removed_duplicates', 0)}")
         line(f"Missing values (raw): {report.get('raw_missing_pct', 0.0):.1f}%")
         line(f"Missing values (clean): {report.get('clean_missing_pct', 0.0):.1f}%")
         line("")
