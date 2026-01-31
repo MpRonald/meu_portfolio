@@ -2,13 +2,16 @@ name: Keep Render Awake
 
 on:
   schedule:
-    - cron: "*/5 * * * *"   # a cada 5 minutos
+    # a cada 10 minutos
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Ping Render healthz
+      - name: Ping Render app
         run: |
-          curl -fsS https://www.ronaldpio.pt/healthz > /dev/null
+          echo "Pinging Render app..."
+          curl -I https://www.ronaldpio.pt/healthz
