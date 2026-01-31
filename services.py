@@ -1044,17 +1044,17 @@ class PortfolioService:
         Opinionated cleaning:
         - trim strings
         - normalize column names
-        - drop fully empty rows/cols (ONLY fully empty)
-        - convert numeric-like strings (handles PT/EN formats)
-        - parse datetime-like columns (heuristic)
-        - remove duplicates
+        - drop fully empty rows/cols (AFTER normalizing empties)
+        - convert numeric-like strings
+        - parse datetime-like columns (robust: format="mixed")
+        - remove duplicates (exact duplicates)
         """
         if df is None or df.empty:
             return df, {"note": "empty_df"}
 
         original = df.copy()
 
-        # 1) Drop fully empty rows/cols (does NOT remove rows with partial missing)
+        # 1) Drop fully empty rows/cols (initial pass)
         df = df.dropna(axis=0, how="all").dropna(axis=1, how="all")
 
         # 2) Normalize col names (and keep uniqueness)
@@ -1071,50 +1071,56 @@ class PortfolioService:
         col_map = dict(zip(df.columns.tolist(), unique_cols))
         df = df.rename(columns=col_map)
 
-        # 3) Trim strings + normalize nulls
+        # 3) Trim strings + normalize null-like tokens
+        null_tokens = {"", "nan", "none", "null", "NaN", "NULL", "None", "N/A", "n/a"}
         for c in df.columns:
             if df[c].dtype == object:
-                df[c] = df[c].astype(str).str.strip()
-                df.loc[df[c].isin(["", "nan", "none", "null", "NaN", "NULL"]), c] = np.nan
+                s = df[c].astype(str).str.strip()
+                s = s.replace(list(null_tokens), np.nan)
+                df[c] = s
 
-        # 4) Convert numeric-like strings (robust PT/EN)
+        # ✅ 3b) NOW drop rows/cols that became fully empty after cleaning strings
+        df = df.dropna(axis=0, how="all").dropna(axis=1, how="all")
+
+        # 4) Convert numeric-like strings (safe)
         for c in df.columns:
             if df[c].dtype == object:
-                s0 = df[c].dropna()
-                if len(s0) == 0:
+                s = df[c].dropna()
+                if len(s) == 0:
                     continue
-                sample = s0.head(200).astype(str)
 
-                # quick "looks numeric" score:
-                # allow digits, spaces, dot, comma, minus, currency
-                cleaned = sample.str.replace(r"[^\d\-,\.]", "", regex=True)
-                looks = cleaned.str.match(r"^-?[\d\.,]+$").mean()
+                sample = s.head(200).astype(str)
+                # allow comma decimal
+                normalized = sample.str.replace(",", ".", regex=False)
 
-                if looks >= 0.80:
-                    parsed = self._parse_mixed_number(df[c])
-                    # only accept conversion if it doesn't destroy too many values
-                    if parsed.notna().mean() >= 0.60:
-                        df[c] = parsed
+                looks_num = normalized.str.match(r"^-?\d+(\.\d+)?$").mean()
+                if looks_num >= 0.75:
+                    df[c] = pd.to_numeric(df[c].astype(str).str.replace(",", ".", regex=False), errors="coerce")
 
-        # 5) Datetime heuristic (only if many parse)
+        # 5) Datetime parsing (robust: handles mixed formats)
         for c in df.columns:
             if df[c].dtype == object:
                 s = df[c].dropna().astype(str)
                 if len(s) == 0:
                     continue
+
                 sample = s.head(200)
 
-                # Try both dayfirst False and True; pick best
-                p1 = pd.to_datetime(sample, errors="coerce", dayfirst=False)
-                p2 = pd.to_datetime(sample, errors="coerce", dayfirst=True)
+                # Try parse with mixed formats; test both dayfirst False/True and pick best
+                p_false = pd.to_datetime(sample, errors="coerce", format="mixed", dayfirst=False)
+                p_true  = pd.to_datetime(sample, errors="coerce", format="mixed", dayfirst=True)
 
-                best = p1 if p1.notna().mean() >= p2.notna().mean() else p2
-                best_dayfirst = False if best is p1 else True
+                r_false = p_false.notna().mean()
+                r_true  = p_true.notna().mean()
 
-                if best.notna().mean() >= 0.70:
-                    df[c] = pd.to_datetime(df[c], errors="coerce", dayfirst=best_dayfirst)
+                best_dayfirst = True if r_true > r_false else False
+                best_ratio = max(r_false, r_true)
 
-        # 6) Remove duplicates
+                # threshold (you can tune)
+                if best_ratio >= 0.60:
+                    df[c] = pd.to_datetime(df[c], errors="coerce", format="mixed", dayfirst=best_dayfirst)
+
+        # 6) Remove duplicates (exact rows)
         before_dups = len(df)
         df = df.drop_duplicates()
         removed_dups = before_dups - len(df)
@@ -1123,6 +1129,7 @@ class PortfolioService:
 
         report = self.build_data_quality_report(original, df, removed_dups)
         return df, report
+
 
     def build_data_quality_report(self, df_raw: pd.DataFrame, df_clean: pd.DataFrame, removed_dups: int) -> Dict[str, Any]:
         def missing_pct(d: pd.DataFrame) -> float:
@@ -1161,10 +1168,26 @@ class PortfolioService:
             "top_missing_cols": top_missing_cols,
         }
 
+    
     def export_excel_cleaned(self, df_clean: pd.DataFrame, out_path: Path) -> None:
         out_path.parent.mkdir(parents=True, exist_ok=True)
+
         with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
             df_clean.to_excel(writer, sheet_name="cleaned_data", index=False)
+
+            # Apply date formats (Excel-friendly)
+            ws = writer.sheets["cleaned_data"]
+
+            # Map column index -> dtype
+            dtypes = df_clean.dtypes.to_list()
+
+            # Excel columns are 1-indexed; row 1 is header
+            for j, dtype in enumerate(dtypes, start=1):
+                if np.issubdtype(dtype, np.datetime64):
+                    for row in range(2, 2 + len(df_clean)):  # skip header
+                        cell = ws.cell(row=row, column=j)
+                        cell.number_format = "yyyy-mm-dd"  # or "yyyy-mm-dd hh:mm:ss"
+
 
     def export_pdf_report(self, report: Dict[str, Any], meta: Dict[str, Any], out_path: Path) -> None:
         out_path.parent.mkdir(parents=True, exist_ok=True)
