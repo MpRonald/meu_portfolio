@@ -1,7 +1,10 @@
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
+from datetime import datetime
 
+import io
+import re
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -9,6 +12,10 @@ from scipy import stats
 import plotly
 import plotly.express as px
 import plotly.graph_objects as go
+
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import cm
+from reportlab.pdfgen import canvas
 
 
 class PortfolioService:
@@ -907,4 +914,261 @@ class PortfolioService:
             "kpi_b": kpi_b,
             "cat_compare_json": self._to_plotly_json(fig_cat_cmp),
             "trend_compare_json": self._to_plotly_json(fig_trend_cmp),
+        }
+
+    # ==========================================================
+    # ✅ NEW: Data Cleaner & Quality Report
+    # ==========================================================
+    def read_uploaded_dataset(self, file_storage) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+        """
+        Reads CSV/XLSX/XLS from a Flask FileStorage.
+        Returns df + meta.
+        """
+        filename = (file_storage.filename or "").strip()
+        if not filename:
+            raise ValueError("Empty filename.")
+
+        ext = filename.lower().split(".")[-1]
+        content = file_storage.read()
+        if not content:
+            raise ValueError("Uploaded file is empty.")
+
+        bio = io.BytesIO(content)
+
+        if ext in {"csv", "txt"}:
+            # try utf-8, fallback latin-1
+            try:
+                df = pd.read_csv(bio, sep=None, engine="python")
+            except Exception:
+                bio.seek(0)
+                df = pd.read_csv(bio, sep=None, engine="python", encoding="latin-1")
+        elif ext in {"xlsx", "xls"}:
+            df = pd.read_excel(bio)
+        else:
+            raise ValueError("Unsupported file type. Please upload CSV or Excel (xlsx/xls).")
+
+        meta = {
+            "filename": filename,
+            "ext": ext,
+            "rows": int(len(df)),
+            "cols": int(df.shape[1]),
+        }
+        return df, meta
+
+    def _normalize_colname(self, c: str) -> str:
+        c0 = str(c).strip()
+        c0 = re.sub(r"\s+", " ", c0)
+        c1 = c0.lower()
+        c1 = re.sub(r"[^\w\s]", "", c1)        # remove punctuation
+        c1 = re.sub(r"\s+", "_", c1)           # spaces -> underscore
+        c1 = re.sub(r"_+", "_", c1).strip("_")
+        return c1 if c1 else "col"
+
+    def clean_dataframe(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+        """
+        Opinionated cleaning:
+        - trim strings
+        - normalize column names
+        - drop fully empty rows/cols
+        - convert numeric-like strings
+        - parse datetime-like columns (heuristic)
+        - remove duplicates
+        """
+        if df is None or df.empty:
+            return df, {"note": "empty_df"}
+
+        original = df.copy()
+
+        # 1) Drop fully empty rows/cols
+        df = df.dropna(axis=0, how="all").dropna(axis=1, how="all")
+
+        # 2) Normalize col names (and keep uniqueness)
+        new_cols = [self._normalize_colname(c) for c in df.columns]
+        # ensure unique names
+        seen = {}
+        unique_cols = []
+        for c in new_cols:
+            if c not in seen:
+                seen[c] = 0
+                unique_cols.append(c)
+            else:
+                seen[c] += 1
+                unique_cols.append(f"{c}_{seen[c]}")
+        col_map = dict(zip(df.columns.tolist(), unique_cols))
+        df = df.rename(columns=col_map)
+
+        # 3) Trim strings
+        for c in df.columns:
+            if df[c].dtype == object:
+                df[c] = df[c].astype(str).str.strip()
+                df.loc[df[c].isin(["", "nan", "none", "null", "NaN", "NULL"]), c] = np.nan
+
+        # 4) Convert numeric-like strings (safe)
+        for c in df.columns:
+            if df[c].dtype == object:
+                s = df[c].dropna()
+                if len(s) == 0:
+                    continue
+                # heuristic: if many values look numeric
+                sample = s.head(200).astype(str)
+                looks_num = sample.str.replace(",", ".", regex=False).str.match(r"^-?\d+(\.\d+)?$").mean()
+                if looks_num >= 0.75:
+                    df[c] = pd.to_numeric(df[c].astype(str).str.replace(",", ".", regex=False), errors="coerce")
+
+        # 5) Datetime heuristic (only if many parse)
+        for c in df.columns:
+            if df[c].dtype == object:
+                s = df[c].dropna().astype(str)
+                if len(s) == 0:
+                    continue
+                sample = s.head(200)
+                parsed = pd.to_datetime(sample, errors="coerce", dayfirst=False, infer_datetime_format=True)
+                if parsed.notna().mean() >= 0.70:
+                    df[c] = pd.to_datetime(df[c], errors="coerce", dayfirst=False, infer_datetime_format=True)
+
+        # 6) Remove duplicates
+        before_dups = len(df)
+        df = df.drop_duplicates()
+        removed_dups = before_dups - len(df)
+
+        # 7) Final: sort columns a bit (stable)
+        df = df.reset_index(drop=True)
+
+        report = self.build_data_quality_report(original, df, removed_dups)
+        return df, report
+
+    def build_data_quality_report(self, df_raw: pd.DataFrame, df_clean: pd.DataFrame, removed_dups: int) -> Dict[str, Any]:
+        def missing_pct(d: pd.DataFrame) -> float:
+            if d is None or d.empty:
+                return 0.0
+            total = d.shape[0] * d.shape[1]
+            if total == 0:
+                return 0.0
+            return float(d.isna().sum().sum()) / float(total) * 100.0
+
+        raw_rows, raw_cols = (int(df_raw.shape[0]), int(df_raw.shape[1])) if df_raw is not None else (0, 0)
+        clean_rows, clean_cols = (int(df_clean.shape[0]), int(df_clean.shape[1])) if df_clean is not None else (0, 0)
+
+        raw_missing = missing_pct(df_raw)
+        clean_missing = missing_pct(df_clean)
+
+        # basic type summary
+        dtypes = {}
+        if df_clean is not None and not df_clean.empty:
+            for k, v in df_clean.dtypes.items():
+                dtypes[str(v)] = dtypes.get(str(v), 0) + 1
+
+        # top missing columns
+        top_missing_cols = []
+        if df_clean is not None and not df_clean.empty:
+            miss = (df_clean.isna().mean() * 100.0).sort_values(ascending=False).head(8)
+            top_missing_cols = [{"col": idx, "missing_pct": float(val)} for idx, val in miss.items() if val > 0]
+
+        return {
+            "raw_rows": raw_rows,
+            "raw_cols": raw_cols,
+            "clean_rows": clean_rows,
+            "clean_cols": clean_cols,
+            "raw_missing_pct": float(raw_missing),
+            "clean_missing_pct": float(clean_missing),
+            "removed_duplicates": int(removed_dups),
+            "dtype_summary": dtypes,
+            "top_missing_cols": top_missing_cols,
+        }
+
+    def export_excel_cleaned(self, df_clean: pd.DataFrame, out_path: Path) -> None:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
+            df_clean.to_excel(writer, sheet_name="cleaned_data", index=False)
+
+    def export_pdf_report(self, report: Dict[str, Any], meta: Dict[str, Any], out_path: Path) -> None:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+
+        c = canvas.Canvas(str(out_path), pagesize=A4)
+        width, height = A4
+
+        x = 2.0 * cm
+        y = height - 2.0 * cm
+
+        def line(txt: str, dy: float = 0.65 * cm, size: int = 11, bold: bool = False):
+            nonlocal y
+            c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
+            c.drawString(x, y, txt)
+            y -= dy
+            if y < 2.0 * cm:
+                c.showPage()
+                y = height - 2.0 * cm
+
+        line("Data Cleaner — Quality Report", dy=0.9 * cm, size=16, bold=True)
+        line(f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC", size=10)
+        line("")
+
+        line("File metadata", bold=True)
+        line(f"Filename: {meta.get('filename', '—')}")
+        line(f"Type: {meta.get('ext', '—')}")
+        line("")
+
+        line("Shape & completeness", bold=True)
+        line(f"Raw rows/cols: {report.get('raw_rows', 0)} / {report.get('raw_cols', 0)}")
+        line(f"Clean rows/cols: {report.get('clean_rows', 0)} / {report.get('clean_cols', 0)}")
+        line(f"Removed duplicates: {report.get('removed_duplicates', 0)}")
+        line(f"Missing values (raw): {report.get('raw_missing_pct', 0.0):.1f}%")
+        line(f"Missing values (clean): {report.get('clean_missing_pct', 0.0):.1f}%")
+        line("")
+
+        line("Column dtypes (clean)", bold=True)
+        dts = report.get("dtype_summary") or {}
+        if dts:
+            for k, v in dts.items():
+                line(f"{k}: {v}")
+        else:
+            line("—")
+        line("")
+
+        line("Top missing columns (clean)", bold=True)
+        tmc = report.get("top_missing_cols") or []
+        if tmc:
+            for item in tmc:
+                line(f"{item['col']}: {item['missing_pct']:.1f}%")
+        else:
+            line("—")
+
+        c.save()
+
+    def clean_uploaded_file(self, file_storage, artifacts_dir: Path, file_id: str) -> Dict[str, Any]:
+        """
+        Orchestrates:
+        - read uploaded dataset
+        - clean
+        - write cleaned excel + pdf report into artifacts
+        - return payload for UI preview & download links
+        """
+        df_raw, meta = self.read_uploaded_dataset(file_storage)
+        df_clean, report = self.clean_dataframe(df_raw)
+
+        # persist artifacts
+        excel_path = artifacts_dir / f"cleaned_{file_id}.xlsx"
+        pdf_path = artifacts_dir / f"report_{file_id}.pdf"
+        self.export_excel_cleaned(df_clean, excel_path)
+        self.export_pdf_report(report, meta, pdf_path)
+
+        # preview for UI
+        preview = df_clean.head(20).copy()
+        # friendly datetime formatting
+        for c in preview.columns:
+            if np.issubdtype(preview[c].dtype, np.datetime64):
+                preview[c] = preview[c].dt.strftime("%Y-%m-%d %H:%M:%S")
+
+        table = {
+            "columns": preview.columns.tolist(),
+            "rows": preview.fillna("").values.tolist(),
+        }
+
+        return {
+            "file_id": file_id,
+            "meta": meta,
+            "report": report,
+            "table": table,
+            "download_excel_url": f"/cleaner/download/{file_id}/excel",
+            "download_pdf_url": f"/cleaner/download/{file_id}/pdf",
         }

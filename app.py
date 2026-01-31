@@ -4,12 +4,13 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pandas as pd
 import plotly
 import plotly.express as px
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_file
 from werkzeug.middleware.proxy_fix import ProxyFix
 from jinja2 import TemplateNotFound
 
@@ -380,6 +381,57 @@ def create_app() -> Flask:
             charts=charts,
             table=table,
             compare=compare,
+        )
+
+    # =========================
+    # DATA CLEANER (CSV/Excel → Clean + Report → Excel/PDF)
+    # =========================
+    @app.route("/cleaner", methods=["GET", "POST"])
+    def data_cleaner():
+        result = None
+        error = None
+
+        if request.method == "POST":
+            f = request.files.get("file")
+            if not f or not f.filename:
+                error = "Please select a CSV or Excel file."
+            else:
+                try:
+                    file_id = uuid4().hex[:12]
+                    payload = service.clean_uploaded_file(
+                        file_storage=f,
+                        artifacts_dir=Path(app.config["ARTIF_DIR"]),
+                        file_id=file_id,
+                    )
+                    result = payload
+                except Exception as e:
+                    error = str(e)
+
+        return safe_render("cleaner.html", result=result, error=error)
+
+    @app.route("/cleaner/download/<file_id>/<kind>", methods=["GET"])
+    def cleaner_download(file_id: str, kind: str):
+        # kind: "excel" | "pdf"
+        artifacts_dir = Path(app.config["ARTIF_DIR"])
+        if kind == "excel":
+            path = artifacts_dir / f"cleaned_{file_id}.xlsx"
+            mimetype = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            download_name = f"cleaned_{file_id}.xlsx"
+        elif kind == "pdf":
+            path = artifacts_dir / f"report_{file_id}.pdf"
+            mimetype = "application/pdf"
+            download_name = f"report_{file_id}.pdf"
+        else:
+            return jsonify({"error": "invalid_kind"}), 400
+
+        if not path.exists():
+            return jsonify({"error": "file_not_found"}), 404
+
+        return send_file(
+            path,
+            mimetype=mimetype,
+            as_attachment=True,
+            download_name=download_name
         )
 
     return app

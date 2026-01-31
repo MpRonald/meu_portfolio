@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container" style="max-width: 1100px; padding: 28px 16px;">
+  <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+    <div>
+      <h1 style="margin:0 0 6px 0;">Data Cleaner & Quality Report</h1>
+      <p style="margin:0; opacity:0.85;">
+        Upload a <strong>CSV</strong> or <strong>Excel</strong> file. The app cleans the dataset and generates
+        a <strong>cleaned Excel</strong> + a <strong>PDF quality report</strong>.
+      </p>
+    </div>
+    <div style="opacity:0.7; font-size: 0.95rem;">
+      Route: <code>/cleaner</code>
+    </div>
+  </div>
+
+  <div style="height:14px;"></div>
+
+  <!-- Upload card -->
+  <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:18px; background: rgba(255,255,255,0.03);">
+    <form method="POST" enctype="multipart/form-data" id="uploadForm">
+      <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <input
+          type="file"
+          name="file"
+          id="fileInput"
+          accept=".csv,.txt,.xlsx,.xls"
+          style="flex:1; min-width:260px; padding:10px; border-radius:10px; border:1px dashed rgba(255,255,255,0.25); background:rgba(0,0,0,0.08);"
+          required
+        />
+        <button
+          type="submit"
+          id="btnSubmit"
+          style="padding:10px 14px; border-radius:10px; border:0; cursor:pointer; font-weight:600;"
+        >
+          Clean & Generate Report
+        </button>
+      </div>
+
+      <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div style="opacity:0.8; font-size:0.95rem;">
+          Supported: CSV, XLSX, XLS • Tip: header row recommended.
+        </div>
+        <div id="uploadStatus" style="opacity:0.85; font-size:0.95rem;"></div>
+      </div>
+    </form>
+
+    {% if error %}
+      <div style="margin-top:14px; padding:12px; border-radius:10px; background: rgba(255, 70, 70, 0.12); border: 1px solid rgba(255, 70, 70, 0.35);">
+        <strong>Error:</strong> {{ error }}
+      </div>
+    {% endif %}
+  </div>
+
+  {% if result %}
+    <div style="height:18px;"></div>
+
+    <!-- Summary cards -->
+    <div style="display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:12px;">
+      <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:14px; background: rgba(255,255,255,0.03);">
+        <div style="opacity:0.75;">Raw shape</div>
+        <div style="font-size:1.25rem; font-weight:700;">
+          {{ result.report.raw_rows }} × {{ result.report.raw_cols }}
+        </div>
+      </div>
+      <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:14px; background: rgba(255,255,255,0.03);">
+        <div style="opacity:0.75;">Clean shape</div>
+        <div style="font-size:1.25rem; font-weight:700;">
+          {{ result.report.clean_rows }} × {{ result.report.clean_cols }}
+        </div>
+      </div>
+      <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:14px; background: rgba(255,255,255,0.03);">
+        <div style="opacity:0.75;">Duplicates removed</div>
+        <div style="font-size:1.25rem; font-weight:700;">
+          {{ result.report.removed_duplicates }}
+        </div>
+      </div>
+      <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:14px; background: rgba(255,255,255,0.03);">
+        <div style="opacity:0.75;">Missing values</div>
+        <div style="font-size:1.1rem; font-weight:700;">
+          Raw: {{ "%.1f"|format(result.report.raw_missing_pct) }}%<br/>
+          Clean: {{ "%.1f"|format(result.report.clean_missing_pct) }}%
+        </div>
+      </div>
+    </div>
+
+    <div style="height:12px;"></div>
+
+    <!-- Download buttons -->
+    <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+      <a href="{{ result.download_excel_url }}"
+         style="display:inline-block; padding:10px 14px; border-radius:10px; text-decoration:none; font-weight:700; border:1px solid rgba(255,255,255,0.18);">
+        Download cleaned Excel (.xlsx)
+      </a>
+      <a href="{{ result.download_pdf_url }}"
+         style="display:inline-block; padding:10px 14px; border-radius:10px; text-decoration:none; font-weight:700; border:1px solid rgba(255,255,255,0.18);">
+        Download quality report (PDF)
+      </a>
+
+      <div style="opacity:0.75; font-size:0.95rem; margin-left:auto;">
+        Source file: <strong>{{ result.meta.filename }}</strong>
+      </div>
+    </div>
+
+    <div style="height:14px;"></div>
+
+    <!-- Top missing columns -->
+    <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:16px; background: rgba(255,255,255,0.03);">
+      <h3 style="margin:0 0 8px 0;">Quick diagnostics</h3>
+
+      <div style="display:grid; grid-template-columns: 1.2fr 0.8fr; gap:14px;">
+        <div>
+          <div style="opacity:0.8; margin-bottom:6px;"><strong>Cleaned dtypes</strong></div>
+          <ul style="margin:0; padding-left:18px;">
+            {% for k, v in result.report.dtype_summary.items() %}
+              <li><code>{{ k }}</code> — {{ v }} column(s)</li>
+            {% endfor %}
+            {% if result.report.dtype_summary|length == 0 %}
+              <li>—</li>
+            {% endif %}
+          </ul>
+        </div>
+
+        <div>
+          <div style="opacity:0.8; margin-bottom:6px;"><strong>Most missing columns</strong></div>
+          <ul style="margin:0; padding-left:18px;">
+            {% for item in result.report.top_missing_cols %}
+              <li><code>{{ item.col }}</code> — {{ "%.1f"|format(item.missing_pct) }}%</li>
+            {% endfor %}
+            {% if result.report.top_missing_cols|length == 0 %}
+              <li>—</li>
+            {% endif %}
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:14px;"></div>
+
+    <!-- Preview table -->
+    <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:16px; background: rgba(255,255,255,0.03);">
+      <h3 style="margin:0 0 8px 0;">Preview (first 20 rows)</h3>
+      <div style="overflow:auto; border-radius:10px; border:1px solid rgba(255,255,255,0.10);">
+        <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
+          <thead style="background: rgba(255,255,255,0.06);">
+            <tr>
+              {% for c in result.table.columns %}
+                <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,0.10); white-space:nowrap;">
+                  {{ c }}
+                </th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in result.table.rows %}
+              <tr>
+                {% for cell in row %}
+                  <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
+                    {{ cell }}
+                  </td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+            {% if result.table.rows|length == 0 %}
+              <tr>
+                <td colspan="{{ result.table.columns|length }}" style="padding:12px; opacity:0.75;">
+                  No rows to display.
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:10px; opacity:0.8; font-size:0.95rem;">
+        Cleaning steps: trim strings • normalize column names • drop empty rows/cols • parse numeric/datetime • remove duplicates.
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const input = document.getElementById("fileInput");
+    const status = document.getElementById("uploadStatus");
+    const form = document.getElementById("uploadForm");
+    const btn = document.getElementById("btnSubmit");
+
+    if (input) {
+      input.addEventListener("change", () => {
+        if (!input.files || !input.files.length) {
+          status.textContent = "";
+          return;
+        }
+        status.textContent = "Selected: " + input.files[0].name;
+      });
+    }
+
+    if (form) {
+      form.addEventListener("submit", () => {
+        btn.disabled = true;
+        btn.textContent = "Processing...";
+        status.textContent = "Uploading and cleaning dataset...";
+      });
+    }
+  })();
+</script>
+{% endblock %}
