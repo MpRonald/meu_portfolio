@@ -11,4 +11,4 @@ jobs:
     steps:
       - name: Ping Render healthz
         run: |
-          curl -fsS https://ronaldpio.onrender.com/healthz > /dev/null
+          curl -fsS https://www.ronaldpio.pt/healthz > /dev/null
