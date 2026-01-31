@@ -9,6 +9,9 @@
         Upload a <strong>CSV</strong> or <strong>Excel</strong> file. The app cleans the dataset and generates
         a <strong>cleaned Excel</strong> + a <strong>PDF quality report</strong>.
       </p>
+      <p style="margin:8px 0 0 0; opacity:0.85;">
+        <strong>Upload limit:</strong> {{ max_upload_mb }}MB.
+      </p>
     </div>
     <div style="opacity:0.7; font-size: 0.95rem;">
       Route: <code>/cleaner</code>
@@ -29,6 +32,7 @@
           style="flex:1; min-width:260px; padding:10px; border-radius:10px; border:1px dashed rgba(255,255,255,0.25); background:rgba(0,0,0,0.08);"
           required
         />
+
         <button
           type="submit"
           id="btnSubmit"
@@ -36,11 +40,19 @@
         >
           Clean & Generate Report
         </button>
+
+        <a
+          href="{{ url_for('data_cleaner') }}"
+          style="padding:10px 14px; border-radius:10px; text-decoration:none; font-weight:700; border:1px solid rgba(255,255,255,0.18);"
+          title="Clear result and go back"
+        >
+          Clear
+        </a>
       </div>
 
       <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
         <div style="opacity:0.8; font-size:0.95rem;">
-          Supported: CSV, XLSX, XLS • Tip: header row recommended.
+          Supported: CSV, XLSX, XLS • Max size: <strong>{{ max_upload_mb }}MB</strong>
         </div>
         <div id="uploadStatus" style="opacity:0.85; font-size:0.95rem;"></div>
       </div>
@@ -53,9 +65,65 @@
     {% endif %}
   </div>
 
-  {% if result %}
-    <div style="height:18px;"></div>
+  <div style="height:18px;"></div>
 
+  <!-- ✅ DEMO SECTION (always visible when no result) -->
+  {% if not result %}
+  <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:16px; background: rgba(255,255,255,0.03);">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+      <div>
+        <h3 style="margin:0 0 6px 0;">Demo dataset (preview)</h3>
+        <div style="opacity:0.8; font-size:0.95rem;">
+          File: <strong>{{ demo.meta.filename }}</strong> · Rows: {{ demo.meta.rows }} · Cols: {{ demo.meta.cols }}
+        </div>
+      </div>
+      <a href="{{ url_for('cleaner_demo_download') }}"
+         style="display:inline-block; padding:10px 14px; border-radius:10px; text-decoration:none; font-weight:700; border:1px solid rgba(255,255,255,0.18);">
+        Download demo CSV
+      </a>
+    </div>
+
+    <div style="height:12px;"></div>
+
+    <div style="overflow:auto; border-radius:10px; border:1px solid rgba(255,255,255,0.10);">
+      <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
+        <thead style="background: rgba(255,255,255,0.06);">
+          <tr>
+            {% for c in demo.table.columns %}
+              <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,0.10); white-space:nowrap;">
+                {{ c }}
+              </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in demo.table.rows %}
+            <tr>
+              {% for cell in row %}
+                <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
+                  {{ cell }}
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+          {% if demo.table.rows|length == 0 %}
+            <tr>
+              <td colspan="{{ demo.table.columns|length }}" style="padding:12px; opacity:0.75;">
+                Demo not found. Put the file in <code>data/dirty_demo_dataset.csv</code>.
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:10px; opacity:0.8; font-size:0.95rem;">
+      Tip: download the demo and upload it to see the cleaner report output.
+    </div>
+  </div>
+  {% endif %}
+
+  {% if result %}
     <!-- Summary cards -->
     <div style="display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:12px;">
       <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:14px; background: rgba(255,255,255,0.03);">
@@ -105,7 +173,7 @@
 
     <div style="height:14px;"></div>
 
-    <!-- Top missing columns -->
+    <!-- Quick diagnostics -->
     <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:16px; background: rgba(255,255,255,0.03);">
       <h3 style="margin:0 0 8px 0;">Quick diagnostics</h3>
 
@@ -174,7 +242,7 @@
       </div>
 
       <div style="margin-top:10px; opacity:0.8; font-size:0.95rem;">
-        Cleaning steps: trim strings • normalize column names • drop empty rows/cols • parse numeric/datetime • remove duplicates (rows + optional *_id).
+        Cleaning steps: trim strings • normalize column names • drop empty rows/cols • parse numeric/datetime • remove duplicates.
       </div>
     </div>
   {% endif %}
@@ -189,21 +257,44 @@
     const form = document.getElementById("uploadForm");
     const btn = document.getElementById("btnSubmit");
 
+    const MAX_MB = Number("{{ max_upload_mb }}");
+    const MAX_BYTES = MAX_MB * 1024 * 1024;
+
     if (input) {
       input.addEventListener("change", () => {
         if (!input.files || !input.files.length) {
           status.textContent = "";
           return;
         }
-        status.textContent = "Selected: " + input.files[0].name;
+        const f = input.files[0];
+        const sizeMB = (f.size / (1024 * 1024)).toFixed(2);
+
+        if (f.size > MAX_BYTES) {
+          status.textContent = `Selected: ${f.name} (${sizeMB}MB) — TOO LARGE (max ${MAX_MB}MB)`;
+          status.style.color = "rgb(255, 110, 110)";
+        } else {
+          status.textContent = `Selected: ${f.name} (${sizeMB}MB)`;
+          status.style.color = "";
+        }
       });
     }
 
     if (form) {
-      form.addEventListener("submit", () => {
+      form.addEventListener("submit", (e) => {
+        if (!input.files || !input.files.length) return;
+
+        const f = input.files[0];
+        if (f.size > MAX_BYTES) {
+          e.preventDefault();
+          status.textContent = `File too large — please upload a file up to ${MAX_MB}MB.`;
+          status.style.color = "rgb(255, 110, 110)";
+          return;
+        }
+
         btn.disabled = true;
         btn.textContent = "Processing...";
         status.textContent = "Uploading and cleaning dataset...";
+        status.style.color = "";
       });
     }
   })();

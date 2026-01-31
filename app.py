@@ -10,8 +10,9 @@ import pandas as pd
 import plotly
 import plotly.express as px
 
-from flask import Flask, render_template, jsonify, request, send_file
+from flask import Flask, render_template, jsonify, request, send_file, redirect
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.exceptions import RequestEntityTooLarge
 from jinja2 import TemplateNotFound
 
 from services import PortfolioService
@@ -25,6 +26,17 @@ DATA_DIR = Path(os.getenv("DATA_DIR", str(BASE_DIR / "data"))).resolve()
 ARTIF_DIR = Path(os.getenv("ARTIF_DIR", str(BASE_DIR / "artifacts"))).resolve()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 ARTIF_DIR.mkdir(parents=True, exist_ok=True)
+
+# =========================
+# Upload limit (5MB)
+# =========================
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # 5MB
+
+# =========================
+# Demo CSV (shown by default on /cleaner)
+# Put your demo file here: /data/demo_dirty.csv
+# =========================
+DEMO_CSV_PATH = DATA_DIR / "demo_dirty.csv"
 
 
 # =========================
@@ -100,6 +112,9 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
+    # ✅ Enforce upload limit (5MB)
+    app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
+
     # ✅ Inject current year into all templates (base.html footer)
     @app.context_processor
     def inject_current_year():
@@ -118,6 +133,18 @@ def create_app() -> Flask:
     _configure_logging(app)
 
     service = PortfolioService(timeout=30, data_dir=app.config["DATA_DIR"])
+
+    # =========================
+    # 413 handler (file too large)
+    # =========================
+    @app.errorhandler(RequestEntityTooLarge)
+    def handle_413(_e):
+        # redirect back to cleaner page with a friendly message
+        return safe_render(
+            "cleaner.html",
+            result=None,
+            error="File too large. Max allowed size is 5MB.",
+        ), 413
 
     @app.after_request
     def add_default_headers(resp):
@@ -151,6 +178,65 @@ def create_app() -> Flask:
                 "context_keys": sorted(list(ctx.keys()))
             }), 200
 
+    # =========================
+    # Demo helper
+    # =========================
+    def build_demo_result():
+        """
+        Loads a local demo CSV (data/demo_dirty.csv), cleans it,
+        generates artifacts, and returns a 'result' payload compatible with cleaner.html.
+        """
+        if not DEMO_CSV_PATH.exists():
+            return None, f"Demo CSV not found at: {DEMO_CSV_PATH.name}. Put it inside /data."
+
+        try:
+            df_raw = pd.read_csv(DEMO_CSV_PATH, sep=None, engine="python")
+            # Clean + report using existing service functions
+            df_clean, report = service.clean_dataframe(df_raw)
+
+            file_id = "demo"  # stable id for demo; overwrites artifacts
+            artifacts_dir = Path(app.config["ARTIF_DIR"])
+            excel_path = artifacts_dir / f"cleaned_{file_id}.xlsx"
+            pdf_path = artifacts_dir / f"report_{file_id}.pdf"
+
+            meta = {
+                "filename": DEMO_CSV_PATH.name,
+                "ext": "csv",
+                "rows": int(len(df_raw)),
+                "cols": int(df_raw.shape[1]),
+            }
+
+            service.export_excel_cleaned(df_clean, excel_path)
+            service.export_pdf_report(report, meta, pdf_path)
+
+            # Preview table same as clean_uploaded_file
+            preview = df_clean.head(20).copy()
+            for c in preview.columns:
+                if pd.api.types.is_datetime64_any_dtype(preview[c]):
+                    preview[c] = preview[c].dt.strftime("%Y-%m-%d %H:%M:%S")
+
+            table = {
+                "columns": preview.columns.tolist(),
+                "rows": preview.fillna("").values.tolist(),
+            }
+
+            return {
+                "file_id": file_id,
+                "meta": meta,
+                "report": report,
+                "table": table,
+                "download_excel_url": f"/cleaner/download/{file_id}/excel",
+                "download_pdf_url": f"/cleaner/download/{file_id}/pdf",
+                "is_demo": True,
+                "max_upload_mb": 5,
+            }, None
+
+        except Exception as e:
+            return None, f"Failed to load demo CSV: {e}"
+
+    # =========================
+    # Routes
+    # =========================
     @app.route("/healthz")
     def healthz():
         return jsonify({
@@ -346,27 +432,49 @@ def create_app() -> Flask:
 
     # =========================
     # DATA CLEANER (CSV/Excel → Clean + Report → Excel/PDF)
+    # - Default shows demo unless ?clear=1
+    # - Force demo with ?demo=1
     # =========================
     @app.route("/cleaner", methods=["GET", "POST"])
     def data_cleaner():
         result = None
         error = None
 
-        if request.method == "POST":
-            f = request.files.get("file")
-            if not f or not f.filename:
-                error = "Please select a CSV or Excel file."
-            else:
-                try:
-                    file_id = uuid4().hex[:12]
-                    payload = service.clean_uploaded_file(
-                        file_storage=f,
-                        artifacts_dir=Path(app.config["ARTIF_DIR"]),
-                        file_id=file_id,
-                    )
-                    result = payload
-                except Exception as e:
-                    error = str(e)
+        # GET controls
+        clear = (request.args.get("clear") or "").strip() == "1"
+        demo = (request.args.get("demo") or "").strip() == "1"
+        show_demo = (demo or (not clear))
+
+        if request.method == "GET":
+            if show_demo:
+                result, error = build_demo_result()
+            return safe_render("cleaner.html", result=result, error=error)
+
+        # POST (upload) - will respect MAX_CONTENT_LENGTH
+        f = request.files.get("file")
+        if not f or not f.filename:
+            error = "Please select a CSV or Excel file (max 5MB)."
+            # if user didn't clear, we can still show demo
+            if show_demo:
+                result, _err = build_demo_result()
+            return safe_render("cleaner.html", result=result, error=error)
+
+        # Extra guard using content_length if present
+        if request.content_length and request.content_length > MAX_UPLOAD_BYTES:
+            return safe_render("cleaner.html", result=None, error="File too large. Max allowed size is 5MB."), 413
+
+        try:
+            file_id = uuid4().hex[:12]
+            payload = service.clean_uploaded_file(
+                file_storage=f,
+                artifacts_dir=Path(app.config["ARTIF_DIR"]),
+                file_id=file_id,
+            )
+            payload["is_demo"] = False
+            payload["max_upload_mb"] = 5
+            result = payload
+        except Exception as e:
+            error = str(e)
 
         return safe_render("cleaner.html", result=result, error=error)
 
