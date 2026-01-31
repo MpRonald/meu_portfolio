@@ -1196,18 +1196,25 @@ class PortfolioService:
     def export_excel_cleaned(self, df_clean: pd.DataFrame, out_path: Path) -> None:
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
+        n_rows = int(len(df_clean))
+        n_cols = int(df_clean.shape[1])
+
         with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
             df_clean.to_excel(writer, sheet_name="cleaned_data", index=False)
 
-            # Apply date formats (Excel-friendly)
+            # ✅ MUITO IMPORTANTE:
+            # Em datasets grandes, NÃO formatar datas célula-a-célula (explode tempo e RAM)
+            if n_rows > 50000 or n_cols > 80:
+                return
+
             ws = writer.sheets["cleaned_data"]
             dtypes = df_clean.dtypes.to_list()
 
             for j, dtype in enumerate(dtypes, start=1):
                 if np.issubdtype(dtype, np.datetime64):
-                    for row in range(2, 2 + len(df_clean)):
-                        cell = ws.cell(row=row, column=j)
-                        cell.number_format = "yyyy-mm-dd"
+                    for row in range(2, 2 + n_rows):  # skip header
+                        ws.cell(row=row, column=j).number_format = "yyyy-mm-dd"
+
 
     def export_pdf_report(self, report: Dict[str, Any], meta: Dict[str, Any], out_path: Path) -> None:
         out_path.parent.mkdir(parents=True, exist_ok=True)
