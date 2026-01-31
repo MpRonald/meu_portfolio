@@ -2,14 +2,18 @@ name: Keep Render Awake
 
 on:
   schedule:
-    # a cada 10 minutos
-    - cron: "*/10 * * * *"
+    # 06:00–23:00 → every 10 minutes
+    - cron: "*/10 6-23 * * *"
+
+    # 23:00–05:59 → every 30 minutes
+    - cron: "*/30 0-5 * * *"
+
+  # permite rodar manualmente (botão "Run workflow")
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
-
     steps:
       - name: Ping Render app
         run: |
