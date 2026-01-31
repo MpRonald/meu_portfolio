@@ -171,7 +171,6 @@ def create_app() -> Flask:
         df_completo = service.load_ames_data()
         df = df_completo.copy()
 
-        # numeric candidates based on project columns (fallback to any numeric)
         numeric_cols = [c for c in COLUNAS_PROJETO if c in df.columns and c != "faixa_preco"]
         if not numeric_cols:
             numeric_cols = df.select_dtypes(include="number").columns.tolist()
@@ -179,18 +178,15 @@ def create_app() -> Flask:
         if not numeric_cols:
             return jsonify({"error": "No numeric columns available in the Ames dataset."}), 500
 
-        # friendly names (keep compat)
         nomes_amig = dict(NOMES_AMIGAVEIS)
         for c in numeric_cols:
             nomes_amig.setdefault(c, c)
 
-        # defaults
         default_var = "preco" if "preco" in numeric_cols else numeric_cols[0]
         var = request.form.get("variavel", default_var)
         if var not in numeric_cols:
             var = default_var
 
-        # ranges
         faixas_unicas = ["Todos"]
         if "faixa_preco" in df.columns:
             faixas_unicas += sorted(df["faixa_preco"].dropna().unique().tolist())
@@ -199,7 +195,6 @@ def create_app() -> Flask:
         if faixa_selecionada not in faixas_unicas:
             faixa_selecionada = "Todos"
 
-        # Build all figures + stats from the service (single source of truth)
         payload = service.build_ames_dashboard_payload(
             df_full=df_completo,
             variavel=var,
@@ -209,7 +204,6 @@ def create_app() -> Flask:
         stats_dict = payload.get("estatisticas") or {}
         testes_extra = payload.get("testes_extra") or {}
 
-        # Executive-friendly normality interpretation (optional text block)
         interpretacao_normalidade = None
         p_shapiro = stats_dict.get("p_valor_shapiro")
         if p_shapiro is not None:
@@ -254,12 +248,9 @@ def create_app() -> Flask:
     def sales_dashboard():
         warning = None
 
-        df_full = service.load_walmart_data()  # data/Walmart.csv
+        df_full = service.load_walmart_data()
         df = df_full.copy()
 
-        # --------
-        # Read filters (GET)
-        # --------
         filters = {
             "date_start": (request.args.get("date_start") or "").strip() or None,
             "date_end": (request.args.get("date_end") or "").strip() or None,
@@ -273,15 +264,9 @@ def create_app() -> Flask:
             "store_b": (request.args.get("store_b") or "None").strip(),
         }
 
-        # Options for dropdowns
         options = service.get_walmart_options(df_full)
-
-        # --------
-        # Apply filters safely
-        # --------
         df_f = df.copy()
 
-        # Date range
         if filters["date_start"]:
             try:
                 ds = pd.to_datetime(filters["date_start"], errors="raise")
@@ -295,28 +280,17 @@ def create_app() -> Flask:
             except Exception:
                 warning = "Invalid end date. Ignoring date_end."
 
-        # Category
         if filters["category"] != "All":
             df_f = df_f[df_f["category"] == filters["category"]]
-
-        # Store
         if filters["store_location"] != "All":
             df_f = df_f[df_f["store_location"] == filters["store_location"]]
-
-        # Product
         if filters["product_name"] != "All":
             df_f = df_f[df_f["product_name"] == filters["product_name"]]
-
-        # Promotion applied
         if filters["promotion_applied"] in {"true", "false"}:
             want = filters["promotion_applied"] == "true"
             df_f = df_f[df_f["promotion_applied"] == want]
-
-        # Loyalty level
         if filters["loyalty"] != "All":
             df_f = df_f[df_f["customer_loyalty_level"] == filters["loyalty"]]
-
-        # Payment method
         if filters["payment_method"] != "All":
             df_f = df_f[df_f["payment_method"] == filters["payment_method"]]
 
@@ -324,21 +298,12 @@ def create_app() -> Flask:
             warning = warning or "No data for the selected filters. Showing empty charts."
             df_f = df_f.head(0)
 
-        # --------
-        # Meta info
-        # --------
         meta = service.get_walmart_meta(df_full)
         meta_selected = service.get_walmart_meta(df_f, fallback_full=meta)
 
-        # --------
-        # KPIs & charts (global filtered scope)
-        # --------
         kpis = service.compute_sales_kpis(df_f)
         charts = service.build_sales_charts(df_f, df_full)
 
-        # --------
-        # Comparison (Store A vs Store B) — optional
-        # --------
         compare = None
         store_a = filters["store_a"]
         store_b = filters["store_b"]
@@ -348,9 +313,6 @@ def create_app() -> Flask:
             df_b = df_f[df_f["store_location"] == store_b].copy()
             compare = service.build_store_comparison(df_a, df_b, store_a, store_b)
 
-        # --------
-        # Table preview (first rows)
-        # --------
         preview_cols = [
             "transaction_id", "transaction_date", "store_location",
             "category", "product_name", "quantity_sold", "unit_price", "revenue",
@@ -360,7 +322,6 @@ def create_app() -> Flask:
         preview_cols = [c for c in preview_cols if c in df_f.columns]
         table_df = df_f[preview_cols].head(12).copy()
 
-        # Friendly formatting in preview
         if "transaction_date" in table_df.columns:
             table_df["transaction_date"] = table_df["transaction_date"].dt.strftime("%Y-%m-%d")
         if "revenue" in table_df.columns:
@@ -411,7 +372,6 @@ def create_app() -> Flask:
 
     @app.route("/cleaner/download/<file_id>/<kind>", methods=["GET"])
     def cleaner_download(file_id: str, kind: str):
-        # kind: "excel" | "pdf"
         artifacts_dir = Path(app.config["ARTIF_DIR"])
         if kind == "excel":
             path = artifacts_dir / f"cleaned_{file_id}.xlsx"

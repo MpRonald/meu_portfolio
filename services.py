@@ -91,7 +91,6 @@ class PortfolioService:
 
         df = pd.read_csv(csv_path)
 
-        # attempt numeric conversion for object columns (except known categoricals)
         for c in df.columns:
             if c in {"faixa_preco", "bairro", "Neighborhood"}:
                 continue
@@ -100,7 +99,6 @@ class PortfolioService:
                 if converted.notna().sum() > 0:
                     df[c] = converted
 
-        # normalize common important numeric cols if present
         for c in ["preco", "preco_m2", "YearBuilt", "Year_Built", "year_built", "latitude", "lat", "longitude", "lon"]:
             if c in df.columns:
                 df[c] = pd.to_numeric(df[c], errors="coerce")
@@ -181,7 +179,6 @@ class PortfolioService:
         resultados: Dict[str, Optional[float]] = {}
         s = serie.dropna()
 
-        # Jarque–Bera
         try:
             jb_stat, jb_p = stats.jarque_bera(s)
             resultados["jb_stat"] = float(jb_stat)
@@ -190,7 +187,6 @@ class PortfolioService:
             resultados["jb_stat"] = None
             resultados["jb_p"] = None
 
-        # Pearson with targets
         for alvo in ["preco", "preco_m2"]:
             r_key = f"corr_{alvo}_r"
             p_key = f"corr_{alvo}_p"
@@ -211,7 +207,6 @@ class PortfolioService:
                 resultados[r_key] = None
                 resultados[p_key] = None
 
-        # Spearman with price
         if "preco" in df_filtrado.columns and var in df_filtrado.columns and var != "preco":
             subset = df_filtrado[[var, "preco"]].dropna()
             if len(subset) >= 3:
@@ -229,7 +224,6 @@ class PortfolioService:
             resultados["corr_spearman_r"] = None
             resultados["corr_spearman_p"] = None
 
-        # Kruskal–Wallis by faixa_preco
         if df_completo is not None and "faixa_preco" in df_completo.columns and var in df_completo.columns:
             grupos = []
             for faixa in sorted(df_completo["faixa_preco"].dropna().unique().tolist()):
@@ -252,7 +246,6 @@ class PortfolioService:
             resultados["kruskal_H"] = None
             resultados["kruskal_p"] = None
 
-        # Simple linear regression: preco ~ var
         if "preco" in df_filtrado.columns and var in df_filtrado.columns and var != "preco":
             subset = df_filtrado[[var, "preco"]].dropna()
             if len(subset) >= 3:
@@ -287,13 +280,6 @@ class PortfolioService:
         faixa_preco: str = "Todos",
         max_heatmap_cols: int = 14,
     ) -> Dict[str, Any]:
-        """
-        Builds everything the executive ames.html expects:
-        - estatisticas (1D stats)
-        - testes_extra (pearson/regression/kruskal/etc.)
-        - graph_*_json strings (or None if not available)
-        - df_filtrado used internally (optional)
-        """
         if df_full is None or df_full.empty:
             return {
                 "df_filtrado": pd.DataFrame(),
@@ -312,13 +298,10 @@ class PortfolioService:
 
         df = df_full.copy()
 
-        # filter by faixa_preco when available
         if faixa_preco and faixa_preco != "Todos" and "faixa_preco" in df.columns:
             df = df[df["faixa_preco"].astype(str) == str(faixa_preco)].copy()
 
-        # Ensure numeric driver
         if variavel not in df.columns:
-            # fallback: first numeric col
             num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
             variavel = num_cols[0] if num_cols else variavel
 
@@ -327,10 +310,6 @@ class PortfolioService:
         estatisticas = self.calcular_estatisticas_1d(serie)
         testes_extra = self.calcular_testes_adicionais(serie, df, variavel, df_full)
 
-        # ----------------------------
-        # Charts (executive)
-        # ----------------------------
-        # Histogram
         fig_hist = px.histogram(
             df.assign(_driver=serie),
             x="_driver",
@@ -340,7 +319,6 @@ class PortfolioService:
         )
         fig_hist.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
 
-        # Boxplot
         fig_box = px.box(
             df.assign(_driver=serie),
             y="_driver",
@@ -349,7 +327,6 @@ class PortfolioService:
         )
         fig_box.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
 
-        # Scatter: price vs driver (if preco exists)
         graph_scatter_json = None
         if "preco" in df.columns and variavel in df.columns and variavel != "preco":
             tmp = df[[variavel, "preco"]].copy()
@@ -370,7 +347,6 @@ class PortfolioService:
                 fig_sc.update_yaxes(tickprefix="$")
                 graph_scatter_json = self._to_plotly_json(fig_sc)
 
-        # Boxplot by price range (if faixa_preco exists and price exists)
         graph_box_faixa_json = None
         if "faixa_preco" in df_full.columns and variavel in df_full.columns:
             tmp = df_full[[variavel, "faixa_preco"]].copy()
@@ -388,7 +364,6 @@ class PortfolioService:
                 fig_bf.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
                 graph_box_faixa_json = self._to_plotly_json(fig_bf)
 
-        # Price vs Year Built (if possible)
         graph_preco_ano_json = None
         year_col = self._pick_first_existing_col(df, ["YearBuilt", "Year_Built", "year_built", "ano_construcao"])
         if "preco" in df.columns and year_col is not None:
@@ -410,7 +385,6 @@ class PortfolioService:
                 fig_y.update_yaxes(tickprefix="$")
                 graph_preco_ano_json = self._to_plotly_json(fig_y)
 
-        # Neighborhood comparison (boxplot of price by neighborhood)
         graph_box_bairro_json = None
         graph_bar_bairro_json = None
         neigh_col = self._pick_first_existing_col(df_full, ["bairro", "Neighborhood", "neighborhood"])
@@ -421,7 +395,6 @@ class PortfolioService:
             tmp = tmp.dropna(subset=[neigh_col, "preco"])
             tmp = tmp[tmp[neigh_col] != ""]
             if len(tmp) > 0:
-                # keep top N neighborhoods by count for a clean executive view
                 counts = tmp[neigh_col].value_counts().head(25).index.tolist()
                 tmp2 = tmp[tmp[neigh_col].isin(counts)].copy()
 
@@ -437,7 +410,6 @@ class PortfolioService:
                 fig_nb.update_xaxes(tickangle=45)
                 graph_box_bairro_json = self._to_plotly_json(fig_nb)
 
-                # bar: avg price top 20
                 avg = (
                     tmp.groupby(neigh_col, as_index=False)["preco"]
                     .mean()
@@ -456,10 +428,8 @@ class PortfolioService:
                 fig_bar.update_xaxes(tickangle=45)
                 graph_bar_bairro_json = self._to_plotly_json(fig_bar)
 
-        # Correlation heatmap (numeric columns only)
         graph_heatmap_json = None
         num_cols = df_full.select_dtypes(include=[np.number]).columns.tolist()
-        # prefer a small curated set if exists, else top N numeric
         preferred = [c for c in ["preco", "preco_m2", "GrLivArea", "TotalBsmtSF", "GarageCars", "GarageArea", "OverallQual", "YearBuilt"] if c in num_cols]
         cols = preferred if len(preferred) >= 4 else num_cols[:max_heatmap_cols]
         cols = cols[:max_heatmap_cols]
@@ -475,7 +445,6 @@ class PortfolioService:
             fig_h.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=620)
             graph_heatmap_json = self._to_plotly_json(fig_h)
 
-        # Map (lat/lon)
         graph_map_json = None
         lat_col = self._pick_first_existing_col(df, ["latitude", "lat", "Latitude"])
         lon_col = self._pick_first_existing_col(df, ["longitude", "lon", "Longitude"])
@@ -494,7 +463,6 @@ class PortfolioService:
                     height=520,
                     title="Geographic distribution",
                 )
-                # open-street-map without token
                 fig_map.update_layout(
                     mapbox_style="open-street-map",
                     margin=dict(l=10, r=10, t=55, b=10),
@@ -530,16 +498,13 @@ class PortfolioService:
 
         df = pd.read_csv(csv_path)
 
-        # Parse date
         if "transaction_date" in df.columns:
             df["transaction_date"] = self._safe_to_datetime(df["transaction_date"])
 
-        # Numerics
         for c in ["quantity_sold", "unit_price", "forecasted_demand", "actual_demand"]:
             if c in df.columns:
                 df[c] = pd.to_numeric(df[c], errors="coerce")
 
-        # Boolean normalization
         def to_bool(col: str) -> None:
             if col not in df.columns:
                 return
@@ -551,17 +516,14 @@ class PortfolioService:
         to_bool("promotion_applied")
         to_bool("stockout_indicator")
 
-        # Revenue
         q = df["quantity_sold"] if "quantity_sold" in df.columns else 0
         p = df["unit_price"] if "unit_price" in df.columns else 0
         df["revenue"] = (q * p).astype(float)
 
-        # Clean strings
         for c in ["category", "store_location", "product_name", "payment_method", "customer_loyalty_level"]:
             if c in df.columns:
                 df[c] = df[c].astype(str).str.strip()
 
-        # Keep valid dates
         if "transaction_date" in df.columns:
             df = df.dropna(subset=["transaction_date"])
             df = df.sort_values("transaction_date")
@@ -606,7 +568,6 @@ class PortfolioService:
         }
 
     def compute_sales_kpis(self, df: pd.DataFrame) -> Dict[str, str]:
-        """Executive KPIs (strings) for the dashboard."""
         if df is None or df.empty:
             return {
                 "revenue": self._fmt_money(0.0),
@@ -632,7 +593,6 @@ class PortfolioService:
         if "stockout_indicator" in df.columns and transactions > 0:
             stockout_rate = float(df["stockout_indicator"].mean()) * 100.0
 
-        # Robust MAPE
         mape_str = "—"
         if "forecasted_demand" in df.columns and "actual_demand" in df.columns:
             sub = df[["forecasted_demand", "actual_demand"]].dropna()
@@ -656,11 +616,6 @@ class PortfolioService:
         }
 
     def build_sales_charts(self, df: pd.DataFrame, df_full: pd.DataFrame) -> Dict[str, str]:
-        """
-        Returns Plotly JSON for the charts used in sales.html.
-        Keeps your keys: rev_trend_json, rev_category_json, top_products_json, top_stores_json,
-        payment_mix_json, forecast_scatter_json.
-        """
         if df is None or df.empty:
             empty = px.scatter(pd.DataFrame({"x": [], "y": []}), x="x", y="y", title="No data for current filters")
             js = self._to_plotly_json(empty)
@@ -674,10 +629,6 @@ class PortfolioService:
             }
 
         d = df.copy()
-
-        # --------------------------------------------------
-        # Revenue trend (monthly)
-        # --------------------------------------------------
         d["month"] = d["transaction_date"].dt.to_period("M").dt.to_timestamp()
         rev_m = d.groupby("month", as_index=False)["revenue"].sum()
 
@@ -691,9 +642,6 @@ class PortfolioService:
         fig_trend.update_layout(margin=dict(l=10, r=10, t=55, b=10), height=420)
         fig_trend.update_yaxes(tickprefix="$")
 
-        # --------------------------------------------------
-        # Revenue by category
-        # --------------------------------------------------
         if "category" in d.columns:
             rev_cat = (
                 d.groupby("category", as_index=False)["revenue"]
@@ -717,9 +665,6 @@ class PortfolioService:
                 title="Revenue by category",
             )
 
-        # --------------------------------------------------
-        # Top products (revenue)
-        # --------------------------------------------------
         if "product_name" in d.columns:
             top_p = (
                 d.groupby("product_name", as_index=False)["revenue"]
@@ -745,9 +690,6 @@ class PortfolioService:
                 title="Top products",
             )
 
-        # --------------------------------------------------
-        # Top stores (revenue)
-        # --------------------------------------------------
         if "store_location" in d.columns:
             top_s = (
                 d.groupby("store_location", as_index=False)["revenue"]
@@ -772,9 +714,6 @@ class PortfolioService:
                 title="Top stores",
             )
 
-        # --------------------------------------------------
-        # Payment mix (revenue)
-        # --------------------------------------------------
         if "payment_method" in d.columns:
             pay = (
                 d.groupby("payment_method", as_index=False)["revenue"]
@@ -791,9 +730,6 @@ class PortfolioService:
                 title="Payment mix",
             )
 
-        # --------------------------------------------------
-        # Forecast vs actual demand (scatter + y=x line)
-        # --------------------------------------------------
         if "forecasted_demand" in d.columns and "actual_demand" in d.columns:
             sub = d[["forecasted_demand", "actual_demand"]].dropna()
             sub = sub.head(4000)
@@ -838,12 +774,6 @@ class PortfolioService:
         }
 
     def build_store_comparison(self, df_a: pd.DataFrame, df_b: pd.DataFrame, store_a: str, store_b: str) -> Dict[str, Any]:
-        """
-        Store A vs Store B comparison payload:
-        - KPI blocks for each store
-        - Category comparison grouped bar
-        - Trend comparison line
-        """
         df_a = df_a if df_a is not None else pd.DataFrame()
         df_b = df_b if df_b is not None else pd.DataFrame()
 
@@ -920,10 +850,6 @@ class PortfolioService:
     # ✅ NEW: Data Cleaner & Quality Report
     # ==========================================================
     def read_uploaded_dataset(self, file_storage) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-        """
-        Reads CSV/XLSX/XLS from a Flask FileStorage.
-        Returns df + meta.
-        """
         filename = (file_storage.filename or "").strip()
         if not filename:
             raise ValueError("Empty filename.")
@@ -936,7 +862,6 @@ class PortfolioService:
         bio = io.BytesIO(content)
 
         if ext in {"csv", "txt"}:
-            # try utf-8, fallback latin-1
             try:
                 df = pd.read_csv(bio, sep=None, engine="python")
             except Exception:
@@ -959,10 +884,98 @@ class PortfolioService:
         c0 = str(c).strip()
         c0 = re.sub(r"\s+", " ", c0)
         c1 = c0.lower()
-        c1 = re.sub(r"[^\w\s]", "", c1)        # remove punctuation
-        c1 = re.sub(r"\s+", "_", c1)           # spaces -> underscore
+        c1 = re.sub(r"[^\w\s]", "", c1)
+        c1 = re.sub(r"\s+", "_", c1)
         c1 = re.sub(r"_+", "_", c1).strip("_")
         return c1 if c1 else "col"
+
+    def _parse_numeric_series(self, s: pd.Series) -> pd.Series:
+        """
+        Robust numeric parsing for messy real-world strings:
+        - handles 1.234,50 and 1,234.50
+        - handles currency symbols and spaces
+        - chooses decimal separator by the last occurrence of ',' or '.'
+        """
+        def parse_one(x: str) -> str:
+            x = str(x).strip()
+            if x == "":
+                return ""
+            x = x.replace("\u00A0", " ")  # non-breaking space
+            x = re.sub(r"[€$£]", "", x)
+            x = x.replace(" ", "")
+
+            # negatives like (123,45)
+            neg = False
+            if x.startswith("(") and x.endswith(")"):
+                neg = True
+                x = x[1:-1].strip()
+
+            # keep only digits, comma, dot, minus
+            x = re.sub(r"[^0-9,\.\-]", "", x)
+
+            if "," in x and "." in x:
+                # decimal separator = whichever appears last
+                if x.rfind(",") > x.rfind("."):
+                    # EU style: 1.234,56 => 1234.56
+                    x = x.replace(".", "")
+                    x = x.replace(",", ".")
+                else:
+                    # US style: 1,234.56 => 1234.56
+                    x = x.replace(",", "")
+            elif "," in x and "." not in x:
+                # likely EU decimal
+                x = x.replace(",", ".")
+            # else only dot or only digits -> ok
+
+            if neg and x and x[0] != "-":
+                x = "-" + x
+            return x
+
+        out = s.astype(str).map(parse_one)
+        return pd.to_numeric(out, errors="coerce")
+
+    def _should_convert_numeric(self, s: pd.Series, threshold: float = 0.75) -> bool:
+        s2 = s.dropna().astype(str)
+        if len(s2) == 0:
+            return False
+        sample = s2.head(300)
+        parsed = self._parse_numeric_series(sample)
+        return float(parsed.notna().mean()) >= threshold
+
+    def _best_datetime_parse(self, s: pd.Series, threshold: float = 0.70) -> Optional[Tuple[bool, float]]:
+        """
+        Try dayfirst False and True, choose the best parse ratio.
+        Returns (dayfirst, ratio) if good enough else None.
+        """
+        s2 = s.dropna().astype(str)
+        if len(s2) == 0:
+            return None
+        sample = s2.head(300)
+
+        p1 = pd.to_datetime(sample, errors="coerce", dayfirst=False)
+        r1 = float(p1.notna().mean())
+
+        p2 = pd.to_datetime(sample, errors="coerce", dayfirst=True)
+        r2 = float(p2.notna().mean())
+
+        best_dayfirst, best_ratio = (False, r1) if r1 >= r2 else (True, r2)
+        if best_ratio >= threshold:
+            return best_dayfirst, best_ratio
+        return None
+
+    def _pick_id_column(self, df: pd.DataFrame) -> Optional[str]:
+        """
+        Choose an ID-like column for safer dedup if it exists.
+        Preference: exact 'id', then '*_id'.
+        """
+        cols = df.columns.tolist()
+        if "id" in cols:
+            return "id"
+        candidates = [c for c in cols if c.endswith("_id")]
+        if candidates:
+            # pick the one with lowest unique ratio? keep simple:
+            return candidates[0]
+        return None
 
     def clean_dataframe(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         """
@@ -970,21 +983,21 @@ class PortfolioService:
         - trim strings
         - normalize column names
         - drop fully empty rows/cols
-        - convert numeric-like strings
-        - parse datetime-like columns (heuristic)
-        - remove duplicates
+        - convert numeric-like strings (robust EU/US)
+        - parse datetime-like columns (best of dayfirst True/False)
+        - remove duplicates (full row + optional *_id)
         """
         if df is None or df.empty:
             return df, {"note": "empty_df"}
 
         original = df.copy()
 
-        # 1) Drop fully empty rows/cols
-        df = df.dropna(axis=0, how="all").dropna(axis=1, how="all")
+        # 1) Drop fully empty rows/cols (SAFE: does NOT drop partial rows)
+        df = df.dropna(axis=0, how="all")
+        df = df.dropna(axis=1, how="all")
 
-        # 2) Normalize col names (and keep uniqueness)
+        # 2) Normalize column names (unique)
         new_cols = [self._normalize_colname(c) for c in df.columns]
-        # ensure unique names
         seen = {}
         unique_cols = []
         for c in new_cols:
@@ -994,47 +1007,55 @@ class PortfolioService:
             else:
                 seen[c] += 1
                 unique_cols.append(f"{c}_{seen[c]}")
-        col_map = dict(zip(df.columns.tolist(), unique_cols))
-        df = df.rename(columns=col_map)
+        df = df.rename(columns=dict(zip(df.columns.tolist(), unique_cols)))
 
-        # 3) Trim strings
+        # 3) Trim strings & standardize null-likes
+        null_like = {"", "nan", "none", "null", "n/a", "na", "NaN", "NULL", "None"}
         for c in df.columns:
             if df[c].dtype == object:
                 df[c] = df[c].astype(str).str.strip()
-                df.loc[df[c].isin(["", "nan", "none", "null", "NaN", "NULL"]), c] = np.nan
+                df.loc[df[c].isin(null_like), c] = np.nan
 
-        # 4) Convert numeric-like strings (safe)
+        # 4) Convert numeric-like columns (robust)
         for c in df.columns:
             if df[c].dtype == object:
-                s = df[c].dropna()
-                if len(s) == 0:
-                    continue
-                # heuristic: if many values look numeric
-                sample = s.head(200).astype(str)
-                looks_num = sample.str.replace(",", ".", regex=False).str.match(r"^-?\d+(\.\d+)?$").mean()
-                if looks_num >= 0.75:
-                    df[c] = pd.to_numeric(df[c].astype(str).str.replace(",", ".", regex=False), errors="coerce")
+                if self._should_convert_numeric(df[c]):
+                    df[c] = self._parse_numeric_series(df[c])
 
-        # 5) Datetime heuristic (only if many parse)
+        # 5) Datetime heuristic (best parse)
         for c in df.columns:
             if df[c].dtype == object:
-                s = df[c].dropna().astype(str)
-                if len(s) == 0:
-                    continue
-                sample = s.head(200)
-                parsed = pd.to_datetime(sample, errors="coerce", dayfirst=False, infer_datetime_format=True)
-                if parsed.notna().mean() >= 0.70:
-                    df[c] = pd.to_datetime(df[c], errors="coerce", dayfirst=False, infer_datetime_format=True)
+                best = self._best_datetime_parse(df[c])
+                if best is not None:
+                    dayfirst, _ratio = best
+                    df[c] = pd.to_datetime(df[c], errors="coerce", dayfirst=dayfirst)
 
         # 6) Remove duplicates
-        before_dups = len(df)
+        before = len(df)
         df = df.drop_duplicates()
-        removed_dups = before_dups - len(df)
+        removed_full_row = before - len(df)
 
-        # 7) Final: sort columns a bit (stable)
+        # 6b) Optional: remove duplicates by an ID-like column (safer than guessing)
+        removed_by_id = 0
+        id_col = self._pick_id_column(df)
+        if id_col is not None and id_col in df.columns:
+            # if duplicates exist in id_col, dedup keeping first
+            dup_mask = df[id_col].duplicated(keep="first")
+            if bool(dup_mask.any()):
+                before_id = len(df)
+                df = df[~dup_mask].copy()
+                removed_by_id = before_id - len(df)
+
+        removed_dups = int(removed_full_row + removed_by_id)
+
         df = df.reset_index(drop=True)
 
         report = self.build_data_quality_report(original, df, removed_dups)
+        # extra details (useful, but optional for UI)
+        report["removed_duplicates_full_row"] = int(removed_full_row)
+        report["removed_duplicates_by_id"] = int(removed_by_id)
+        report["id_dedup_column"] = id_col if removed_by_id > 0 else None
+
         return df, report
 
     def build_data_quality_report(self, df_raw: pd.DataFrame, df_clean: pd.DataFrame, removed_dups: int) -> Dict[str, Any]:
@@ -1052,13 +1073,11 @@ class PortfolioService:
         raw_missing = missing_pct(df_raw)
         clean_missing = missing_pct(df_clean)
 
-        # basic type summary
         dtypes = {}
         if df_clean is not None and not df_clean.empty:
             for k, v in df_clean.dtypes.items():
                 dtypes[str(v)] = dtypes.get(str(v), 0) + 1
 
-        # top missing columns
         top_missing_cols = []
         if df_clean is not None and not df_clean.empty:
             miss = (df_clean.isna().mean() * 100.0).sort_values(ascending=False).head(8)
@@ -1111,7 +1130,14 @@ class PortfolioService:
         line("Shape & completeness", bold=True)
         line(f"Raw rows/cols: {report.get('raw_rows', 0)} / {report.get('raw_cols', 0)}")
         line(f"Clean rows/cols: {report.get('clean_rows', 0)} / {report.get('clean_cols', 0)}")
-        line(f"Removed duplicates: {report.get('removed_duplicates', 0)}")
+        line(f"Removed duplicates (total): {report.get('removed_duplicates', 0)}")
+
+        # extra duplicate details if present
+        if report.get("removed_duplicates_by_id", 0) > 0:
+            line(f" - by ID column ({report.get('id_dedup_column')}): {report.get('removed_duplicates_by_id')}", size=10)
+        if report.get("removed_duplicates_full_row", 0) > 0:
+            line(f" - identical rows: {report.get('removed_duplicates_full_row')}", size=10)
+
         line(f"Missing values (raw): {report.get('raw_missing_pct', 0.0):.1f}%")
         line(f"Missing values (clean): {report.get('clean_missing_pct', 0.0):.1f}%")
         line("")
@@ -1136,25 +1162,15 @@ class PortfolioService:
         c.save()
 
     def clean_uploaded_file(self, file_storage, artifacts_dir: Path, file_id: str) -> Dict[str, Any]:
-        """
-        Orchestrates:
-        - read uploaded dataset
-        - clean
-        - write cleaned excel + pdf report into artifacts
-        - return payload for UI preview & download links
-        """
         df_raw, meta = self.read_uploaded_dataset(file_storage)
         df_clean, report = self.clean_dataframe(df_raw)
 
-        # persist artifacts
         excel_path = artifacts_dir / f"cleaned_{file_id}.xlsx"
         pdf_path = artifacts_dir / f"report_{file_id}.pdf"
         self.export_excel_cleaned(df_clean, excel_path)
         self.export_pdf_report(report, meta, pdf_path)
 
-        # preview for UI
         preview = df_clean.head(20).copy()
-        # friendly datetime formatting
         for c in preview.columns:
             if np.issubdtype(preview[c].dtype, np.datetime64):
                 preview[c] = preview[c].dt.strftime("%Y-%m-%d %H:%M:%S")
