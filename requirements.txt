@@ -13,3 +13,4 @@ plotly==5.23.0
 prophet==1.1.5
 setuptools>=70.0.0
 wheel>=0.43.0
+reportlab==4.2.0
