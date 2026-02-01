@@ -2,252 +2,362 @@
 {% block title %}Data Science Portfolio · Ronald Pio{% endblock %}
 {% block content %}
 
-<div class="container-xl" style="max-width: 1200px;">
+<div class="container-xl fade-in-up" style="max-width: 1200px;">
 
-  <!-- CENTERED HERO (NO PHOTO) -->
-  <section class="hero mb-5">
-    <div class="d-flex flex-column align-items-center text-center">
+  <!-- HERO -->
+  <section class="py-5">
+    <div class="row align-items-center g-4">
 
-      <h1 class="display-5 fw-bold mb-2">Ronald Marques Pio</h1>
+      <div class="col-lg-7">
+        <div class="mb-2">
+          <span class="badge rounded-pill text-bg-light border">Data Science</span>
+          <span class="badge rounded-pill text-bg-light border">Analytics</span>
+          <span class="badge rounded-pill text-bg-light border">Python</span>
+          <span class="badge rounded-pill text-bg-light border">SQL</span>
+          <span class="badge rounded-pill text-bg-light border">Power BI</span>
+        </div>
 
-      <p class="lead text-muted mb-1">
-        Data Scientist & Data Analyst · Python · Machine Learning · Business Analytics
-      </p>
+        <h1 class="display-5 fw-bold mb-2">Ronald Marques Pio</h1>
 
-      <p class="text-muted small mb-3">
-        Aveiro, Portugal · Portuguese & Brazilian citizenship
-      </p>
+        <p class="lead text-muted mb-3">
+          Data Scientist & Analytics Engineer focused on turning messy data into decisions —
+          dashboards, automation, and predictive models.
+        </p>
 
-      <p class="text-muted mb-3" style="max-width: 700px;">
-        Results-driven professional with experience turning complex data into clear decisions for leadership —
-        from churn and credit risk to sales, operational analytics, and large-scale European datasets.
-      </p>
+        <p class="text-muted mb-4" style="max-width: 720px;">
+          I build practical solutions: data cleaning, ETL, API integrations, reporting automation, and
+          models for business outcomes (demand, churn, risk, and performance monitoring). :contentReference[oaicite:1]{index=1}
+        </p>
 
-      <!-- BADGES -->
-      <div class="d-flex flex-wrap justify-content-center gap-2 mb-3">
-        <span class="badge rounded-pill text-bg-light border">Machine Learning</span>
-        <span class="badge rounded-pill text-bg-light border">Data Analysis</span>
-        <span class="badge rounded-pill text-bg-light border">Power BI</span>
-        <span class="badge rounded-pill text-bg-light border">Python</span>
-        <span class="badge rounded-pill text-bg-light border">SQL</span>
-        <span class="badge rounded-pill text-bg-light border">Business Analytics</span>
-        <span class="badge rounded-pill text-bg-light border">Portuguese NLP</span>
+        <div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-primary" href="{{ url_for('data_cleaner') }}">Try the Data Cleaner</a>
+          <a class="btn btn-outline-secondary" href="{{ url_for('sales_dashboard') }}">Open Sales Dashboard</a>
+          <a class="btn btn-outline-secondary" href="{{ url_for('ames_dashboard') }}">Explore Real Estate</a>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <a class="btn btn-outline-secondary" href="https://www.linkedin.com/in/ronaldpio" target="_blank" rel="noopener">
+            LinkedIn
+          </a>
+          <a class="btn btn-outline-secondary" href="https://github.com/MpRonald" target="_blank" rel="noopener">
+            GitHub
+          </a>
+        </div>
+
+        <div class="mt-3 text-muted small">
+          Based in Aveiro, Portugal · Available for Portugal and Europe roles. :contentReference[oaicite:2]{index=2}
+        </div>
       </div>
 
-      <!-- BUTTONS -->
-      <div class="d-flex flex-wrap justify-content-center gap-2">
-        <a class="button ghost" href="https://www.linkedin.com/in/ronaldpio" target="_blank" rel="noopener">LinkedIn →</a>
-        <a class="button ghost" href="https://github.com/MpRonald" target="_blank" rel="noopener">GitHub →</a>
+      <div class="col-lg-5">
+        <div class="card h-100">
+          <div class="card-body">
+            <h2 class="h5 fw-semibold mb-3">What I deliver</h2>
+
+            <div class="d-flex gap-3 mb-3">
+              <div class="flex-shrink-0">
+                <span class="badge rounded-pill text-bg-light border">01</span>
+              </div>
+              <div>
+                <div class="fw-semibold">Data cleaning & standardization</div>
+                <div class="text-muted small">
+                  Fixing formats, types, missing values and duplicates to make data reliable for analysis. :contentReference[oaicite:3]{index=3}
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex gap-3 mb-3">
+              <div class="flex-shrink-0">
+                <span class="badge rounded-pill text-bg-light border">02</span>
+              </div>
+              <div>
+                <div class="fw-semibold">Automation & reporting</div>
+                <div class="text-muted small">
+                  Python + SQL pipelines to reduce manual work and increase consistency in KPIs. :contentReference[oaicite:4]{index=4}
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex gap-3">
+              <div class="flex-shrink-0">
+                <span class="badge rounded-pill text-bg-light border">03</span>
+              </div>
+              <div>
+                <div class="fw-semibold">Dashboards & business analytics</div>
+                <div class="text-muted small">
+                  Executive-friendly monitoring using Power BI / interactive apps for decision-making. :contentReference[oaicite:5]{index=5}
+                </div>
+              </div>
+            </div>
+
+            <hr class="my-4">
+
+            <div class="row g-2">
+              <div class="col-6">
+                <div class="text-muted small">Core stack</div>
+                <div class="fw-semibold">Python · SQL · BI</div>
+              </div>
+              <div class="col-6">
+                <div class="text-muted small">Focus</div>
+                <div class="fw-semibold">Impact & clarity</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
       </div>
 
     </div>
   </section>
 
-  <!-- REAL RESULTS -->
-  <section class="mb-5">
-    <h2 class="h4 mb-3 text-center">Real results delivered by me</h2>
-    <div class="row g-3">
-      <div class="col-md-6">
-        <div class="card h-100">
-          <div class="card-body">
-            <ul class="text-muted small mb-0">
-              <li class="mb-2">
-                <strong>4x reduction in report generation time</strong>
-                by integrating Python and SQL to extract and prepare data from a database with 25M+ rows
-                (Affereo project).
-              </li>
-              <li class="mb-2">
-                <strong>Management dashboards in Power BI</strong> connected to SQL Server, with
-                automatic refresh and near real-time metrics to support strategic decisions
-                (Solicit project).
-              </li>
-              <li class="mb-2">
-                <strong>Automation of weekly, monthly, and quarterly reporting</strong>
-                using Python + SQL, removing repetitive manual tasks and improving indicator reliability.
-              </li>
-              <li>
-                <strong>Risk and scoring models</strong> (churn, credit, user behavior),
-                focused on explaining the “why” behind the outcome for non-technical stakeholders.
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
 
-      <div class="col-md-6">
-        <div class="card h-100">
-          <div class="card-body">
-            <ul class="text-muted small mb-0">
-              <li class="mb-2">
-                <strong>SQL Server performance optimization</strong>, improving query efficiency
-                and table structures for faster responses and more complete reporting.
-              </li>
-              <li class="mb-2">
-                <strong>End-to-end analytics pipelines</strong>
-                from ingestion (APIs, files, databases) to dashboards and predictive models.
-              </li>
-              <li>
-                <strong>Mentoring and training in Data Science</strong>, helping students and professionals
-                get started with Python and Machine Learning.
-              </li>
-            </ul>
+  <!-- VALUE / IMPACT -->
+  <section class="mb-5">
+    <div class="card">
+      <div class="card-body">
+        <div class="row g-4 align-items-center">
+          <div class="col-lg-7">
+            <h2 class="h4 mb-2">Business-driven analytics, built to scale</h2>
+            <p class="text-muted mb-0" style="max-width: 820px;">
+              I’ve worked with data from multiple sources (files, databases, APIs) and built workflows to transform raw
+              data into trustworthy metrics, monitoring tools, and models that support operational and strategic decisions. :contentReference[oaicite:6]{index=6}
+            </p>
+          </div>
+          <div class="col-lg-5">
+            <div class="row g-3">
+              <div class="col-12">
+                <div class="p-3 rounded-3" style="background:#ffffff; border:1px solid #e2e8f0;">
+                  <div class="fw-semibold">ETL & data organization</div>
+                  <div class="text-muted small">From messy inputs to clean, analysis-ready datasets.</div>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="p-3 rounded-3" style="background:#ffffff; border:1px solid #e2e8f0;">
+                  <div class="fw-semibold">Monitoring & decision support</div>
+                  <div class="text-muted small">Dashboards and real-time indicators for leadership.</div>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="p-3 rounded-3" style="background:#ffffff; border:1px solid #e2e8f0;">
+                  <div class="fw-semibold">Practical ML</div>
+                  <div class="text-muted small">Predictive modeling with explainability for stakeholders.</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+
       </div>
     </div>
   </section>
 
-  <!-- INTERACTIVE PROJECTS (CARD BUTTONS) -->
+
+  <!-- INTERACTIVE PROJECTS (KEEP ONLY THESE 3 CARDS) -->
   <section class="mb-5">
-    <h2 class="h4 text-center mb-3">Interactive projects in this portfolio</h2>
+    <div class="d-flex align-items-end justify-content-between flex-wrap gap-2 mb-3">
+      <div>
+        <h2 class="h4 mb-1">Interactive projects</h2>
+        <p class="text-muted mb-0">Three hands-on apps you can open right now.</p>
+      </div>
+      <div class="text-muted small">Tip: start with the Data Cleaner.</div>
+    </div>
 
-    <div class="d-grid gap-3"
-         style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
+    <div class="d-grid gap-3" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
 
-      <!-- SALES (WALMART) -->
       <a class="card portfolio-card text-decoration-none" href="{{ url_for('sales_dashboard') }}">
         <div class="card-body text-center">
-          <h5 class="fw-semibold mb-1">🛒 Sales Dashboard </h5>
-          <p class="text-muted small mb-0">Revenue, promotions, stockouts, demand accuracy & segments</p>
+          <div class="mb-2" style="font-size: 1.4rem;">🛒</div>
+          <h5 class="fw-semibold mb-1">Sales Dashboard</h5>
+          <p class="text-muted small mb-0">
+            Revenue trends, promotions, stockouts, demand accuracy, and mix analysis.
+          </p>
         </div>
       </a>
 
-      <!-- AMES -->
       <a class="card portfolio-card text-decoration-none" href="{{ url_for('ames_dashboard') }}">
         <div class="card-body text-center">
-          <h5 class="fw-semibold mb-1">🏠 Real Estate Statistics</h5>
-          <p class="text-muted small mb-0">Exploratory analysis using the Ames dataset</p>
+          <div class="mb-2" style="font-size: 1.4rem;">🏠</div>
+          <h5 class="fw-semibold mb-1">Real Estate Statistics</h5>
+          <p class="text-muted small mb-0">
+            Exploratory analysis, correlations and distribution insights on housing features.
+          </p>
         </div>
       </a>
 
-      <!-- DATA CLEANER -->
       <a class="card portfolio-card text-decoration-none" href="{{ url_for('data_cleaner') }}">
         <div class="card-body text-center">
-          <h5 class="fw-semibold mb-1">🧼 Data Cleaner & Quality Report</h5>
-          <p class="text-muted small mb-0">Upload CSV/Excel → clean dataset → export Excel + PDF report</p>
+          <div class="mb-2" style="font-size: 1.4rem;">🧼</div>
+          <h5 class="fw-semibold mb-1">Data Cleaner & Quality Report</h5>
+          <p class="text-muted small mb-0">
+            Upload CSV/Excel → clean dataset → export cleaned Excel + PDF report.
+          </p>
         </div>
       </a>
 
     </div>
   </section>
 
-  <!-- PROFESSIONAL EXPERIENCE (HIGHLIGHTS) -->
+
+  <!-- EXPERIENCE (clean layout, not “amateur cards”) -->
   <section class="mb-5">
-    <h2 class="h4 mb-3 text-center">Professional experience in data</h2>
-
     <div class="row g-4">
-      <!-- Freelance -->
-      <div class="col-md-6">
-        <div class="card h-100">
-          <div class="card-body">
-            <h3 class="h6 mb-1">Freelance · Data Scientist & Trainer</h3>
-            <p class="text-muted small mb-2">2024 — Present</p>
-            <ul class="text-muted small mb-0">
-              <li>Development of forecasting, churn, risk, and scoring models.</li>
-              <li>Automation of recurring analytics (weekly/monthly/quarterly) with Python + SQL.</li>
-              <li>Creation of dashboards in Power BI and Streamlit for leadership teams.</li>
-              <li>Training and mentoring in Python, Machine Learning, and data analysis.</li>
-            </ul>
-          </div>
-        </div>
+      <div class="col-lg-5">
+        <h2 class="h4 mb-2">Experience snapshot</h2>
+        <p class="text-muted mb-0">
+          Background across data, IT support, training, and business operations — with a practical approach focused on
+          solving real problems and improving processes. :contentReference[oaicite:7]{index=7}
+        </p>
       </div>
 
-      <!-- Solicit -->
-      <div class="col-md-6">
-        <div class="card h-100">
+      <div class="col-lg-7">
+        <div class="card">
           <div class="card-body">
-            <h3 class="h6 mb-1">Data Scientist · Solicit</h3>
-            <p class="text-muted small mb-2">2024</p>
-            <ul class="text-muted small mb-0">
-              <li>Designed a SQL Server database starting from raw client data.</li>
-              <li>Built Power BI dashboards with advanced DAX for management.</li>
-              <li>Automated report refresh using Power BI and Power Automate.</li>
-              <li>Used Python for validation, data processing, and final report generation.</li>
-            </ul>
+
+            <div class="mb-4">
+              <div class="d-flex justify-content-between flex-wrap gap-2">
+                <div class="fw-semibold">Independent Professional · IT & Data (Freelance)</div>
+                <div class="text-muted small">Aveiro · Dec 2024 — Present</div>
+              </div>
+              <ul class="text-muted small mb-0 mt-2">
+                <li>Support, troubleshooting and user assistance; automation and reporting improvements.</li>
+                <li>Dashboards and indicators in Streamlit/Python and BI tools.</li>
+                <li>Data integration via APIs and structured reporting (weekly/monthly/quarterly).</li>
+                <li>Training delivery (in-person/online) focused on practical outcomes.</li>
+              </ul>
+            </div>
+
+            <div class="mb-4">
+              <div class="d-flex justify-content-between flex-wrap gap-2">
+                <div class="fw-semibold">Data Scientist / Developer · Solicit</div>
+                <div class="text-muted small">Porto · Jun 2024 — Nov 2024</div>
+              </div>
+              <ul class="text-muted small mb-0 mt-2">
+                <li>Internal monitoring and reporting tools to support decisions and operations.</li>
+                <li>Automation to reduce manual errors and improve daily workflow efficiency.</li>
+              </ul>
+            </div>
+
+            <div class="mb-0">
+              <div class="d-flex justify-content-between flex-wrap gap-2">
+                <div class="fw-semibold">Data Scientist · Bussula Diligente</div>
+                <div class="text-muted small">Feb 2023 — Jan 2024</div>
+              </div>
+              <ul class="text-muted small mb-0 mt-2">
+                <li>ETL and analysis using multiple sources including APIs and European databases.</li>
+                <li>Data pipelines with Pandas/NumPy/SQL; patterns and improvement opportunities.</li>
+                <li>Automation to make analysis faster and more consistent.</li>
+              </ul>
+            </div>
+
           </div>
         </div>
-      </div>
 
-      <!-- Affereo -->
-      <div class="col-md-6">
-        <div class="card h-100">
-          <div class="card-body">
-            <h3 class="h6 mb-1">Data Scientist · Affereo</h3>
-            <p class="text-muted small mb-2">2023</p>
-            <ul class="text-muted small mb-0">
-              <li>Worked with a 25M+ row database covering all EU countries.</li>
-              <li>Developed Python + SQL scripts for integration and efficient data extraction.</li>
-              <li>Normalized tables and improved data quality and consistency.</li>
-              <li>Significantly reduced report delivery time for the analytics team.</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <!-- Management / Background -->
-      <div class="col-md-6">
-        <div class="card h-100">
-          <div class="card-body">
-            <h3 class="h6 mb-1">Previous experience in management & operations</h3>
-            <p class="text-muted small mb-2">12+ years in leadership roles</p>
-            <ul class="text-muted small mb-0">
-              <li>Built and led teams with a continuous improvement mindset.</li>
-              <li>Results-driven financial and logistics analysis.</li>
-              <li>Participated in software projects and managed IT responsibilities.</li>
-              <li>Integrated technology solutions into daily business operations.</li>
-            </ul>
-          </div>
+        <div class="mt-3 text-muted small">
+          Earlier career: 10+ years leading projects/teams and supporting IT operations (security, backups, network, equipment). :contentReference[oaicite:8]{index=8}
         </div>
       </div>
     </div>
   </section>
 
-  <!-- SKILLS & EDUCATION -->
-  <section class="row g-4 mb-4">
-    <div class="col-md-4">
-      <div class="card h-100">
-        <div class="card-body">
-          <h2 class="h6 mb-3">Technical skills</h2>
-          <ul class="text-muted small mb-0">
-            <li><strong>Python:</strong> Pandas, NumPy, Scikit-learn, Statsmodels</li>
-            <li><strong>ML:</strong> classification, regression, tree-based models, churn, risk</li>
-            <li><strong>Power BI & DAX:</strong> dashboards, KPIs, automated reporting</li>
-            <li><strong>SQL:</strong> SQL Server, complex queries, optimization</li>
-            <li><strong>NLP:</strong> TF-IDF, sentiment analysis in Portuguese</li>
-            <li><strong>Visualization:</strong> Plotly, Streamlit</li>
-          </ul>
+
+  <!-- SKILLS GRID -->
+  <section class="mb-5">
+    <div class="d-flex align-items-end justify-content-between flex-wrap gap-2 mb-3">
+      <div>
+        <h2 class="h4 mb-1">Technical strengths</h2>
+        <p class="text-muted mb-0">A stack focused on delivery, reliability, and business clarity.</p>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+          <div class="card-body">
+            <h3 class="h6 fw-semibold mb-2">Data & analytics</h3>
+            <ul class="text-muted small mb-0">
+              <li>Data modeling & organization</li>
+              <li>ETL and process automation</li>
+              <li>Statistical analysis and reporting</li>
+              <li>Quality checks and standardization</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+          <div class="card-body">
+            <h3 class="h6 fw-semibold mb-2">Tools</h3>
+            <ul class="text-muted small mb-0">
+              <li>Python (Pandas, NumPy, Scikit-learn)</li>
+              <li>SQL (SQL Server, PostgreSQL, MySQL)</li>
+              <li>Power BI / BI dashboards</li>
+              <li>Flask APIs and lightweight apps</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+          <div class="card-body">
+            <h3 class="h6 fw-semibold mb-2">Collaboration</h3>
+            <ul class="text-muted small mb-0">
+              <li>Clear communication with business & IT</li>
+              <li>Practical mindset and delivery focus</li>
+              <li>Training and mentoring experience</li>
+              <li>SCRUM fundamentals</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="col-md-4">
-      <div class="card h-100">
-        <div class="card-body">
-          <h2 class="h6 mb-3">How I work</h2>
-          <ul class="text-muted small mb-0">
-            <li>Clear communication with business and IT teams.</li>
-            <li>Focus on explaining models in a simple and objective way.</li>
-            <li>Delivery oriented to deadlines and business impact.</li>
-            <li>Technical curiosity + practical mindset: models must create value.</li>
-          </ul>
+    <div class="text-muted small mt-2">
+      Skills and focus areas based on my professional profile and training. :contentReference[oaicite:9]{index=9}
+    </div>
+  </section>
+
+
+  <!-- EDUCATION / LANGUAGES / CTA -->
+  <section class="mb-5">
+    <div class="row g-4">
+      <div class="col-lg-7">
+        <div class="card">
+          <div class="card-body">
+            <h2 class="h4 mb-2">Education & certifications</h2>
+            <ul class="text-muted mb-0">
+              <li>Postgraduate in Big Data & Data Science (PUC) — 2022</li>
+              <li>Bachelor’s in IT Management — 2022</li>
+              <li>Postgraduate in Business Management — 2021</li>
+              <li>Additional training: Python, Flask APIs, Machine Learning, Data Modeling, Scrum, Prompt Engineering, Teaching/Training certification</li>
+            </ul>
+            <div class="text-muted small mt-2">Summary adapted from my CV. :contentReference[oaicite:10]{index=10}</div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="col-md-4">
-      <div class="card h-100">
-        <div class="card-body">
-          <h2 class="h6 mb-3">Education</h2>
-          <ul class="text-muted small mb-3">
-            <li>Postgraduate degree in Big Data & Data Science — PUC</li>
-            <li>Bachelor’s in Information Technology Management</li>
-            <li>Multiple advanced courses in Python, ML, and BI</li>
-            <li>English — B2 level</li>
-          </ul>
-          <p class="small text-muted mb-0">
-            Available for roles such as <strong>Data Scientist</strong> or
-            <strong>Data Analyst</strong> in Portugal and across Europe.
-          </p>
+      <div class="col-lg-5">
+        <div class="card h-100">
+          <div class="card-body">
+            <h2 class="h4 mb-2">Languages</h2>
+            <ul class="text-muted mb-4">
+              <li>Portuguese — Native</li>
+              <li>English — B2</li>
+            </ul>
+
+            <div class="p-3 rounded-3" style="background:#ffffff; border:1px solid #e2e8f0;">
+              <div class="fw-semibold mb-1">Want to talk?</div>
+              <div class="text-muted small mb-3">
+                I’m open to data roles and freelance projects involving analytics, automation, dashboards, and ML.
+              </div>
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-primary" href="https://www.linkedin.com/in/ronaldpio" target="_blank" rel="noopener">Message me on LinkedIn</a>
+                <a class="btn btn-outline-secondary" href="{{ url_for('data_cleaner') }}">Try the Cleaner</a>
+              </div>
+            </div>
+
+          </div>
         </div>
       </div>
     </div>

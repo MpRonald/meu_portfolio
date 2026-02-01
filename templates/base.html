@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>{% block title %}My Portfolio{% endblock %}</title>
+  <title>{% block title %}Ronald · Portfolio{% endblock %}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <!-- Bootstrap -->
@@ -11,17 +11,27 @@
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
   >
 
-  <!-- CSS -->
+  <!-- Bootstrap Icons (optional) -->
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+  >
+
+  <!-- Your CSS (theme) -->
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+  {% block head %}{% endblock %}
 </head>
-<body class="app-body">
 
-  <!-- MINIMAL NAVBAR -->
-  <nav class="navbar navbar-expand-lg app-navbar shadow-sm">
-    <div class="container-xl">
+<body>
 
-      <a class="navbar-brand fw-semibold" href="{{ url_for('index') }}">
-        My Portfolio
+  <!-- NAVBAR -->
+  <nav class="navbar navbar-expand-lg">
+    <div class="container-xl py-2">
+
+      <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url_for('index') }}">
+        <i class="bi bi-bar-chart-fill"></i>
+        <span>Ronaldo · Portfolio</span>
       </a>
 
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-label="Toggle navigation">
@@ -29,47 +39,97 @@
       </button>
 
       <div class="collapse navbar-collapse" id="mainNav">
-        <ul class="navbar-nav ms-auto gap-lg-2">
+        <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2 mt-3 mt-lg-0">
 
           <li class="nav-item">
             <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}"
                href="{{ url_for('index') }}">
-              Home
+              <i class="bi bi-house-door me-1"></i> Home
             </a>
           </li>
 
-          {# Optional: If you later create a /projects route, you can enable this:
           <li class="nav-item">
-            <a class="nav-link {% if request.endpoint == 'projects' %}active{% endif %}"
-               href="{{ url_for('projects') }}">
-              Projects
+            <a class="nav-link {% if request.endpoint == 'ames_dashboard' %}active{% endif %}"
+               href="{{ url_for('ames_dashboard') }}">
+              <i class="bi bi-bar-chart-line me-1"></i> Ames
             </a>
           </li>
-          #}
+
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'sales_dashboard' %}active{% endif %}"
+               href="{{ url_for('sales_dashboard') }}">
+              <i class="bi bi-graph-up-arrow me-1"></i> Sales
+            </a>
+          </li>
+
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'data_cleaner' %}active{% endif %}"
+               href="{{ url_for('data_cleaner') }}">
+              <i class="bi bi-magic me-1"></i> Cleaner
+            </a>
+          </li>
+
+          <!-- Optional: small external links dropdown -->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-link-45deg me-1"></i> Links
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li>
+                <a class="dropdown-item" href="{{ url_for('healthz') }}" target="_blank" rel="noopener">
+                  <i class="bi bi-heart-pulse me-2"></i> Health check
+                </a>
+              </li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <a class="dropdown-item" href="https://github.com/" target="_blank" rel="noopener">
+                  <i class="bi bi-github me-2"></i> GitHub
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item" href="https://www.linkedin.com/" target="_blank" rel="noopener">
+                  <i class="bi bi-linkedin me-2"></i> LinkedIn
+                </a>
+              </li>
+            </ul>
+          </li>
 
         </ul>
       </div>
-
     </div>
   </nav>
 
   <!-- CONTENT -->
-  <main class="app-main py-4">
+  <main class="py-4">
     <div class="container-xl">
+
+      {# Optional flash messages if you use flash() in Flask #}
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <div class="mb-3">
+            {% for msg in messages %}
+              <div class="alert alert-info mb-2" role="alert">
+                {{ msg }}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
       {% block content %}{% endblock %}
     </div>
   </main>
 
-  <!-- JS -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
-  <!-- ✅ Page-specific scripts (e.g., cleaner.html) -->
-  {% block scripts %}{% endblock %}
-
+  <!-- FOOTER -->
   <footer class="app-footer py-3 mt-4 text-center small text-muted">
-    © {{ current_year }} · Data Science Portfolio · Flask
+    <div class="container-xl">
+      © {{ current_year }} · Data Science Portfolio · Flask
+    </div>
   </footer>
 
+  <!-- JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+  {% block scripts %}{% endblock %}
 </body>
 </html>
