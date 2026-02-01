@@ -214,11 +214,13 @@ def create_app() -> Flask:
 
     @app.route("/healthz")
     def healthz():
+        app.logger.info("healthz ping")
         return jsonify({
             "status": "ok",
             "time": datetime.utcnow().isoformat() + "Z",
             "env": app.config.get("ENV_NAME"),
         }), 200
+
 
     @app.route("/")
     def index():
