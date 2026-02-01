@@ -6,7 +6,6 @@ from datetime import datetime
 import io
 import re
 import csv
-
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -829,48 +828,9 @@ class PortfolioService:
         }
 
     # ==========================================================
-    # ✅ Data Cleaner & Quality Report
+    # ✅ Data Cleaner & Quality Report (CSV robust + dates + numeric)
     # ==========================================================
-    def _decode_bytes(self, content: bytes) -> str:
-        text = None
-        for enc in ("utf-8-sig", "utf-8", "latin-1"):
-            try:
-                text = content.decode(enc)
-                break
-            except Exception:
-                continue
-        if text is None:
-            text = content.decode("latin-1", errors="replace")
-        return text
-
-    def _sniff_csv_dialect(self, sample_text: str) -> Tuple[str, str]:
-        """
-        Detect delimiter + quotechar from a sample using csv.Sniffer.
-        Returns (delimiter, quotechar).
-        """
-        # Sniffer can fail on short/dirty inputs; keep safe fallbacks.
-        try:
-            sniffer = csv.Sniffer()
-            dialect = sniffer.sniff(sample_text, delimiters=[",", ";", "\t", "|"])
-            delim = dialect.delimiter
-            quotechar = getattr(dialect, "quotechar", '"') or '"'
-            return delim, quotechar
-        except Exception:
-            # heuristic fallback:
-            counts = {
-                ",": sample_text.count(","),
-                ";": sample_text.count(";"),
-                "\t": sample_text.count("\t"),
-                "|": sample_text.count("|"),
-            }
-            delim = max(counts, key=counts.get) if max(counts.values()) > 0 else ","
-            return delim, '"'
-
     def read_uploaded_dataset(self, file_storage) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-        """
-        Reads CSV/XLSX/XLS from a Flask FileStorage.
-        - CSV: auto-detect delimiter (, ; \\t |) and encoding
-        """
         filename = (file_storage.filename or "").strip()
         if not filename:
             raise ValueError("Empty filename.")
@@ -879,11 +839,6 @@ class PortfolioService:
         content = file_storage.read()
         if not content:
             raise ValueError("Uploaded file is empty.")
-
-        # (Opcional) Guard de tamanho aqui também (recomendado mesmo assim fazer no app.py)
-        # MAX_BYTES = 5 * 1024 * 1024
-        # if len(content) > MAX_BYTES:
-        #     raise ValueError("File too large. Max allowed size is 5MB.")
 
         meta = {"filename": filename, "ext": ext}
 
@@ -896,130 +851,115 @@ class PortfolioService:
         if ext not in {"csv", "txt"}:
             raise ValueError("Unsupported file type. Please upload CSV or Excel (xlsx/xls).")
 
-        text = self._decode_bytes(content)
-
-        # Sniff dialect on first ~50KB (enough for delimiter)
-        sample = text[:50_000]
-        delim, quotechar = self._sniff_csv_dialect(sample)
-        meta.update({"detected_delimiter": delim})
-
-        # Try read with detected delimiter
-        try:
-            df = pd.read_csv(
-                io.StringIO(text),
-                sep=delim,
-                engine="python",
-                quotechar=quotechar,
-            )
-        except Exception:
-            # fallback: pandas automatic separator detection (can be slower)
+        text = None
+        for enc in ("utf-8-sig", "utf-8", "latin-1"):
             try:
-                df = pd.read_csv(io.StringIO(text), sep=None, engine="python")
-                meta["detected_delimiter"] = "auto"
-            except Exception as e:
-                raise ValueError(f"Could not read CSV. Detected delimiter '{delim}'. Error: {e}")
+                text = content.decode(enc)
+                break
+            except Exception:
+                continue
+        if text is None:
+            text = content.decode("latin-1", errors="replace")
 
-        meta.update({"rows": int(len(df)), "cols": int(df.shape[1])})
+        lines = [ln.strip("\n\r") for ln in text.splitlines() if ln.strip("\n\r").strip() != ""]
+        if len(lines) < 2:
+            raise ValueError("CSV has no data rows.")
+
+        # --- detect delimiter (comma, semicolon, tab, pipe)
+        try:
+            sniff = csv.Sniffer().sniff("\n".join(lines[:20]), delimiters=[",", ";", "\t", "|"])
+            delim = sniff.delimiter
+        except Exception:
+            # fallback heuristic
+            candidates = [",", ";", "\t", "|"]
+            scores = {d: lines[0].count(d) for d in candidates}
+            delim = max(scores, key=scores.get) if max(scores.values()) > 0 else ","
+
+        header_raw = next(csv.reader([lines[0]], delimiter=delim, skipinitialspace=True))
+        header = [h.strip() for h in header_raw]
+        n_cols = len(header)
+
+        # Identify money-like columns by header name
+        money_idx = []
+        for i, h in enumerate(header):
+            h_low = h.lower()
+            if any(k in h_low for k in ["€", "eur", "price", "amount", "spend", "total", "valor", "preço", "preco", "custo", "revenue"]):
+                money_idx.append(i)
+
+        def is_int_token(tok: str) -> bool:
+            t = (tok or "").strip()
+            return bool(re.fullmatch(r"\d+", t))
+
+        def is_thousand_token(tok: str) -> bool:
+            t = (tok or "").strip()
+            return bool(re.fullmatch(r"\d{1,3}(\.\d{3})+", t))
+
+        def is_decimal_token(tok: str) -> bool:
+            t = (tok or "").strip()
+            return bool(re.fullmatch(r"\d{1,2}", t))
+
+        def repair_row(parts: List[str]) -> List[str]:
+            parts = [p.strip() for p in parts]
+
+            while len(parts) > n_cols:
+                merged = False
+
+                # Fix decimal comma split: "1.234" ; "50" -> "1.234,50"
+                for j in money_idx:
+                    if j < len(parts) - 1 and len(parts) > n_cols:
+                        if (is_thousand_token(parts[j]) or is_int_token(parts[j])) and is_decimal_token(parts[j + 1]):
+                            parts[j] = f"{parts[j]},{parts[j+1]}"
+                            del parts[j + 1]
+                            merged = True
+                            break
+                if merged:
+                    continue
+
+                # Fallback: merge last two tokens using delimiter char
+                parts[-2] = f"{parts[-2]}{delim}{parts[-1]}"
+                parts = parts[:-1]
+
+            if len(parts) < n_cols:
+                parts = parts + [""] * (n_cols - len(parts))
+
+            return parts[:n_cols]
+
+        rows = []
+        for ln in lines[1:]:
+            parts = next(csv.reader([ln], delimiter=delim, skipinitialspace=True))
+            parts = repair_row(parts)
+            rows.append(parts)
+
+        df = pd.DataFrame(rows, columns=header)
+        meta.update({"rows": int(len(df)), "cols": int(df.shape[1]), "delimiter": delim})
         return df, meta
 
     def _normalize_colname(self, c: str) -> str:
         c0 = str(c).strip()
         c0 = re.sub(r"\s+", " ", c0)
         c1 = c0.lower()
-        c1 = re.sub(r"[^\w\s]", "", c1)        # remove punctuation
-        c1 = re.sub(r"\s+", "_", c1)           # spaces -> underscore
+        c1 = re.sub(r"[^\w\s]", "", c1)
+        c1 = re.sub(r"\s+", "_", c1)
         c1 = re.sub(r"_+", "_", c1).strip("_")
         return c1 if c1 else "col"
 
-    def _parse_mixed_number(self, s: pd.Series) -> pd.Series:
-        """
-        Converts common PT/EN number formats safely:
-        - "1.234,50" -> 1234.50
-        - "1,234.50" -> 1234.50
-        - "845.00"   -> 845.00
-        - "2,450.75" -> 2450.75
-        """
-        if s is None:
-            return s
-
-        x = s.astype(str).str.strip()
-        x = x.replace({"": np.nan, "nan": np.nan, "None": np.nan, "none": np.nan, "null": np.nan, "NULL": np.nan})
-
-        def conv_one(v: str):
-            if v is None or (isinstance(v, float) and np.isnan(v)):
-                return np.nan
-            t = str(v).strip()
-            if t == "":
-                return np.nan
-
-            # keep only digits, dot, comma, minus
-            t = re.sub(r"[^\d\-,\.]", "", t)
-
-            # Case A: contains both comma and dot
-            if "," in t and "." in t:
-                if t.rfind(",") > t.rfind("."):
-                    # "1.234,50" -> remove dots (thousands), comma -> dot
-                    t2 = t.replace(".", "").replace(",", ".")
-                else:
-                    # "1,234.50" -> remove commas (thousands)
-                    t2 = t.replace(",", "")
-                try:
-                    return float(t2)
-                except Exception:
-                    return np.nan
-
-            # Case B: only comma
-            if "," in t and "." not in t:
-                if re.fullmatch(r"-?\d+,\d{1,2}", t):
-                    t2 = t.replace(",", ".")
-                else:
-                    t2 = t.replace(",", "")
-                try:
-                    return float(t2)
-                except Exception:
-                    return np.nan
-
-            # Case C: only dot
-            if "." in t and "," not in t:
-                if re.fullmatch(r"-?\d{1,3}(\.\d{3})+", t):
-                    t2 = t.replace(".", "")
-                else:
-                    t2 = t
-                try:
-                    return float(t2)
-                except Exception:
-                    return np.nan
-
-            # Case D: digits only
-            if re.fullmatch(r"-?\d+", t):
-                try:
-                    return float(t)
-                except Exception:
-                    return np.nan
-
-            return np.nan
-
-        return x.map(conv_one)
-
     def clean_dataframe(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         """
-        Cleaning:
+        Opinionated cleaning:
+        - trim strings
         - normalize column names
-        - trim strings + normalize null tokens
-        - drop fully empty rows/cols (ONLY when all empty)
-        - convert numeric-like strings (robust PT/EN)
-        - parse datetime-like columns (mixed formats, choose best dayfirst)
-        - remove exact duplicates
+        - drop fully empty rows/cols (AFTER normalizing empties)
+        - convert numeric-like strings
+        - parse datetime-like columns (robust: format="mixed")
+        - remove duplicates (exact duplicates)
         """
         if df is None or df.empty:
             return df, {"note": "empty_df"}
 
         original = df.copy()
 
-        # 1) Drop fully empty rows/cols (initial pass)
         df = df.dropna(axis=0, how="all").dropna(axis=1, how="all")
 
-        # 2) Normalize col names (unique)
         new_cols = [self._normalize_colname(c) for c in df.columns]
         seen = {}
         unique_cols = []
@@ -1033,18 +973,15 @@ class PortfolioService:
         col_map = dict(zip(df.columns.tolist(), unique_cols))
         df = df.rename(columns=col_map)
 
-        # 3) Trim strings + normalize null-like tokens
-        null_tokens = {"", "nan", "none", "null", "NaN", "NULL", "None", "N/A", "n/a", "NA", "na"}
+        null_tokens = {"", "nan", "none", "null", "NaN", "NULL", "None", "N/A", "n/a"}
         for c in df.columns:
             if df[c].dtype == object:
                 s = df[c].astype(str).str.strip()
                 s = s.replace(list(null_tokens), np.nan)
                 df[c] = s
 
-        # 3b) Drop rows/cols that became fully empty after token normalization
         df = df.dropna(axis=0, how="all").dropna(axis=1, how="all")
 
-        # 4) Convert numeric-like strings (robust)
         for c in df.columns:
             if df[c].dtype == object:
                 s = df[c].dropna()
@@ -1052,18 +989,12 @@ class PortfolioService:
                     continue
 
                 sample = s.head(200).astype(str)
+                normalized = sample.str.replace(",", ".", regex=False)
 
-                # quick heuristic: many values look numeric when stripped of symbols
-                cleaned = sample.str.replace(r"[^\d\-,\.]", "", regex=True)
-                ratio_numeric_like = cleaned.str.match(r"^-?[\d\.,]+$").mean()
+                looks_num = normalized.str.match(r"^-?\d+(\.\d+)?$").mean()
+                if looks_num >= 0.75:
+                    df[c] = pd.to_numeric(df[c].astype(str).str.replace(",", ".", regex=False), errors="coerce")
 
-                if ratio_numeric_like >= 0.75:
-                    parsed = self._parse_mixed_number(df[c])
-                    # only convert if we actually got many numbers
-                    if parsed.notna().mean() >= 0.60:
-                        df[c] = parsed
-
-        # 5) Datetime parsing (mixed formats, pick best dayfirst)
         for c in df.columns:
             if df[c].dtype == object:
                 s = df[c].dropna().astype(str)
@@ -1084,7 +1015,6 @@ class PortfolioService:
                 if best_ratio >= 0.60:
                     df[c] = pd.to_datetime(df[c], errors="coerce", format="mixed", dayfirst=best_dayfirst)
 
-        # 6) Remove duplicates
         before_dups = len(df)
         df = df.drop_duplicates()
         removed_dups = before_dups - len(df)
@@ -1171,8 +1101,8 @@ class PortfolioService:
         line("File metadata", bold=True)
         line(f"Filename: {meta.get('filename', '—')}")
         line(f"Type: {meta.get('ext', '—')}")
-        if meta.get("detected_delimiter"):
-            line(f"CSV delimiter: {meta.get('detected_delimiter')}")
+        if "delimiter" in meta:
+            line(f"CSV delimiter: {repr(meta.get('delimiter'))}")
         line("")
 
         line("Shape & completeness", bold=True)
@@ -1202,8 +1132,28 @@ class PortfolioService:
 
         c.save()
 
+    # ---------- NEW helper for before/after preview ----------
+    def _df_to_preview_table(self, df: pd.DataFrame, n: int = 20) -> Dict[str, Any]:
+        if df is None or df.empty:
+            return {"columns": [], "rows": []}
+
+        preview = df.head(n).copy()
+
+        for c in preview.columns:
+            if np.issubdtype(preview[c].dtype, np.datetime64):
+                preview[c] = preview[c].dt.strftime("%Y-%m-%d %H:%M:%S")
+
+        return {
+            "columns": preview.columns.tolist(),
+            "rows": preview.fillna("").astype(str).values.tolist(),
+        }
+
     def clean_uploaded_file(self, file_storage, artifacts_dir: Path, file_id: str) -> Dict[str, Any]:
         df_raw, meta = self.read_uploaded_dataset(file_storage)
+
+        # ✅ BEFORE preview (raw)
+        table_raw = self._df_to_preview_table(df_raw, n=20)
+
         df_clean, report = self.clean_dataframe(df_raw)
 
         excel_path = artifacts_dir / f"cleaned_{file_id}.xlsx"
@@ -1211,21 +1161,15 @@ class PortfolioService:
         self.export_excel_cleaned(df_clean, excel_path)
         self.export_pdf_report(report, meta, pdf_path)
 
-        preview = df_clean.head(20).copy()
-        for c in preview.columns:
-            if np.issubdtype(preview[c].dtype, np.datetime64):
-                preview[c] = preview[c].dt.strftime("%Y-%m-%d %H:%M:%S")
-
-        table = {
-            "columns": preview.columns.tolist(),
-            "rows": preview.fillna("").values.tolist(),
-        }
+        # ✅ AFTER preview (cleaned)
+        table_clean = self._df_to_preview_table(df_clean, n=20)
 
         return {
             "file_id": file_id,
             "meta": meta,
             "report": report,
-            "table": table,
+            "table_raw": table_raw,
+            "table_clean": table_clean,
             "download_excel_url": f"/cleaner/download/{file_id}/excel",
             "download_pdf_url": f"/cleaner/download/{file_id}/pdf",
         }

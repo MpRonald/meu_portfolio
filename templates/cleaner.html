@@ -69,67 +69,58 @@
 
   <!-- ✅ DEMO SECTION (always visible when no result) -->
   {% if not result %}
-    {% if demo and demo.meta and demo.table %}
-    <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:16px; background: rgba(255,255,255,0.03);">
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
-        <div>
-          <h3 style="margin:0 0 6px 0;">Demo dataset (preview)</h3>
-          <div style="opacity:0.8; font-size:0.95rem;">
-            File: <strong>{{ demo.meta.filename }}</strong> · Rows: {{ demo.meta.rows }} · Cols: {{ demo.meta.cols }}
-          </div>
+  <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:16px; background: rgba(255,255,255,0.03);">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+      <div>
+        <h3 style="margin:0 0 6px 0;">Demo dataset (preview)</h3>
+        <div style="opacity:0.8; font-size:0.95rem;">
+          File: <strong>{{ demo.meta.filename }}</strong> · Rows: {{ demo.meta.rows }} · Cols: {{ demo.meta.cols }}
         </div>
-        <a href="{{ url_for('cleaner_demo_download') }}"
-           style="display:inline-block; padding:10px 14px; border-radius:10px; text-decoration:none; font-weight:700; border:1px solid rgba(255,255,255,0.18);">
-          Download demo CSV
-        </a>
       </div>
+      <a href="{{ url_for('cleaner_demo_download') }}"
+         style="display:inline-block; padding:10px 14px; border-radius:10px; text-decoration:none; font-weight:700; border:1px solid rgba(255,255,255,0.18);">
+        Download demo CSV
+      </a>
+    </div>
 
-      <div style="height:12px;"></div>
+    <div style="height:12px;"></div>
 
-      <div style="overflow:auto; border-radius:10px; border:1px solid rgba(255,255,255,0.10);">
-        <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
-          <thead style="background: rgba(255,255,255,0.06);">
+    <div style="overflow:auto; border-radius:10px; border:1px solid rgba(255,255,255,0.10);">
+      <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
+        <thead style="background: rgba(255,255,255,0.06);">
+          <tr>
+            {% for c in demo.table.columns %}
+              <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,0.10); white-space:nowrap;">
+                {{ c }}
+              </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in demo.table.rows %}
             <tr>
-              {% for c in demo.table.columns %}
-                <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,0.10); white-space:nowrap;">
-                  {{ c }}
-                </th>
+              {% for cell in row %}
+                <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
+                  {{ cell }}
+                </td>
               {% endfor %}
             </tr>
-          </thead>
-          <tbody>
-            {% for row in demo.table.rows %}
-              <tr>
-                {% for cell in row %}
-                  <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
-                    {{ cell }}
-                  </td>
-                {% endfor %}
-              </tr>
-            {% endfor %}
-            {% if demo.table.rows|length == 0 %}
-              <tr>
-                <td colspan="{{ demo.table.columns|length }}" style="padding:12px; opacity:0.75;">
-                  Demo not found. Put the file in <code>data/dirty_demo_dataset.csv</code>.
-                </td>
-              </tr>
-            {% endif %}
-          </tbody>
-        </table>
-      </div>
+          {% endfor %}
+          {% if demo.table.rows|length == 0 %}
+            <tr>
+              <td colspan="{{ demo.table.columns|length }}" style="padding:12px; opacity:0.75;">
+                Demo not found. Put the file in <code>data/dirty_demo_dataset.csv</code>.
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
 
-      <div style="margin-top:10px; opacity:0.8; font-size:0.95rem;">
-        Tip: download the demo and upload it to see the cleaner report output.
-      </div>
+    <div style="margin-top:10px; opacity:0.8; font-size:0.95rem;">
+      Tip: download the demo and upload it to see the cleaner report output.
     </div>
-    {% else %}
-    <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:16px; background: rgba(255,255,255,0.03);">
-      <h3 style="margin:0 0 6px 0;">Demo dataset</h3>
-      <div style="opacity:0.8; font-size:0.95rem;">
-        Demo is not configured yet. Add the file in <code>data/dirty_demo_dataset.csv</code> and make sure the backend passes <code>demo</code>.
-      </div>
-    </div>
-    {% endif %}
+  </div>
   {% endif %}
 
   {% if result %}
@@ -215,39 +206,101 @@
 
     <div style="height:14px;"></div>
 
-    <!-- Preview table -->
+    <!-- ✅ Preview with TABS -->
     <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:16px; background: rgba(255,255,255,0.03);">
-      <h3 style="margin:0 0 8px 0;">Preview (first 20 rows)</h3>
-      <div style="overflow:auto; border-radius:10px; border:1px solid rgba(255,255,255,0.10);">
-        <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
-          <thead style="background: rgba(255,255,255,0.06);">
-            <tr>
-              {% for c in result.table.columns %}
-                <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,0.10); white-space:nowrap;">
-                  {{ c }}
-                </th>
-              {% endfor %}
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in result.table.rows %}
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <h3 style="margin:0;">Preview (first 20 rows)</h3>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button type="button" class="tabBtn" data-tab="before"
+                  style="padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.08); cursor:pointer; font-weight:700;">
+            Before (raw)
+          </button>
+          <button type="button" class="tabBtn" data-tab="after"
+                  style="padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:transparent; cursor:pointer; font-weight:700;">
+            After (cleaned)
+          </button>
+        </div>
+      </div>
+
+      <div style="height:10px;"></div>
+
+      <!-- BEFORE -->
+      <div class="tabPanel" id="tab-before">
+        <div style="opacity:0.85; font-size:0.95rem; margin-bottom:8px;">
+          Raw file preview (as uploaded).
+        </div>
+
+        <div style="overflow:auto; border-radius:10px; border:1px solid rgba(255,255,255,0.10);">
+          <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
+            <thead style="background: rgba(255,255,255,0.06);">
               <tr>
-                {% for cell in row %}
-                  <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
-                    {{ cell }}
-                  </td>
+                {% for c in result.table_raw.columns %}
+                  <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,0.10); white-space:nowrap;">
+                    {{ c }}
+                  </th>
                 {% endfor %}
               </tr>
-            {% endfor %}
-            {% if result.table.rows|length == 0 %}
+            </thead>
+            <tbody>
+              {% for row in result.table_raw.rows %}
+                <tr>
+                  {% for cell in row %}
+                    <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
+                      {{ cell }}
+                    </td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+              {% if result.table_raw.rows|length == 0 %}
+                <tr>
+                  <td colspan="{{ result.table_raw.columns|length }}" style="padding:12px; opacity:0.75;">
+                    No rows to display.
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- AFTER -->
+      <div class="tabPanel" id="tab-after" style="display:none;">
+        <div style="opacity:0.85; font-size:0.95rem; margin-bottom:8px;">
+          Cleaned preview (after trimming, parsing numeric/datetime, removing duplicates).
+        </div>
+
+        <div style="overflow:auto; border-radius:10px; border:1px solid rgba(255,255,255,0.10);">
+          <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
+            <thead style="background: rgba(255,255,255,0.06);">
               <tr>
-                <td colspan="{{ result.table.columns|length }}" style="padding:12px; opacity:0.75;">
-                  No rows to display.
-                </td>
+                {% for c in result.table_clean.columns %}
+                  <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,0.10); white-space:nowrap;">
+                    {{ c }}
+                  </th>
+                {% endfor %}
               </tr>
-            {% endif %}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {% for row in result.table_clean.rows %}
+                <tr>
+                  {% for cell in row %}
+                    <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
+                      {{ cell }}
+                    </td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+              {% if result.table_clean.rows|length == 0 %}
+                <tr>
+                  <td colspan="{{ result.table_clean.columns|length }}" style="padding:12px; opacity:0.75;">
+                    No rows to display.
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div style="margin-top:10px; opacity:0.8; font-size:0.95rem;">
@@ -306,6 +359,35 @@
         status.style.color = "";
       });
     }
+
+    // Tabs (Before/After)
+    const tabButtons = document.querySelectorAll(".tabBtn");
+    const beforePanel = document.getElementById("tab-before");
+    const afterPanel = document.getElementById("tab-after");
+
+    function setActive(tab) {
+      if (!beforePanel || !afterPanel) return;
+
+      if (tab === "after") {
+        beforePanel.style.display = "none";
+        afterPanel.style.display = "block";
+      } else {
+        beforePanel.style.display = "block";
+        afterPanel.style.display = "none";
+      }
+
+      tabButtons.forEach(btn => {
+        const isActive = btn.getAttribute("data-tab") === tab;
+        btn.style.background = isActive ? "rgba(255,255,255,0.08)" : "transparent";
+      });
+    }
+
+    tabButtons.forEach(btn => {
+      btn.addEventListener("click", () => setActive(btn.getAttribute("data-tab")));
+    });
+
+    // default active tab
+    setActive("before");
   })();
 </script>
 {% endblock %}
