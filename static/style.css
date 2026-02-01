@@ -662,6 +662,271 @@ a:hover {
 
 .sales-compare-kpi:first-of-type { border-top: none; }
 
+/* ======================================================
+   INDEX PAGE · PREMIUM HERO + SECTIONS
+   (Add-on ao teu tema claro)
+   ====================================================== */
+
+.index-page {
+  font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+/* Hero premium (mesma linguagem do sales-hero / ames-hero) */
+.index-hero {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 45%, #eef2ff 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 18px 18px 16px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.index-hero-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.index-kicker {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.index-h1 {
+  margin: 6px 0 8px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+.index-subtitle {
+  margin: 0;
+  max-width: 820px;
+  color: #64748b;
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+/* Chips premium */
+.index-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.index-chip {
+  font-size: 0.75rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  background: rgba(255, 255, 255, 0.70);
+  color: #475569;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+/* Cards de "What I deliver" com mini-ícone */
+.index-deliver-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.02);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.index-deliver-ico {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: rgba(14, 165, 233, 0.10);
+  border: 1px solid rgba(14, 165, 233, 0.25);
+  color: #0369a1;
+  flex-shrink: 0;
+}
+
+.index-hr {
+  border: none;
+  height: 1px;
+  background: rgba(148, 163, 184, 0.45);
+  margin: 14px 0;
+}
+
+/* Grid mais estável para os 3 projetos */
+.index-project-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+/* ======================================================
+   INDEX · COLOR ACCENTS (elegant, not flashy)
+   Scoped to .index-page to avoid affecting other pages
+   ====================================================== */
+
+.index-page {
+  --accent: #0ea5e9;      /* sky */
+  --accent2: #6366f1;     /* indigo */
+  --accent3: #22c55e;     /* green */
+  --accent4: #f97316;     /* orange */
+  --accent5: #ec4899;     /* pink */
+}
+
+/* Give the index a slightly richer background without changing global body */
+.index-page .index-hero {
+  background:
+    radial-gradient(900px 400px at 15% 10%, rgba(14,165,233,0.14), transparent 60%),
+    radial-gradient(900px 420px at 85% 0%, rgba(99,102,241,0.12), transparent 60%),
+    radial-gradient(900px 420px at 80% 90%, rgba(34,197,94,0.10), transparent 60%),
+    linear-gradient(135deg, #ffffff 0%, #f8fafc 45%, #eef2ff 100%);
+  border-radius: 18px;
+}
+
+/* Section title styling (subtle color accent line) */
+.index-page .section-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148,163,184,0.45);
+  background: rgba(255,255,255,0.7);
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+}
+
+.index-page .section-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+}
+
+/* Chips a bit more lively */
+.index-page .index-chip {
+  border: 1px solid rgba(148,163,184,0.6);
+  background: rgba(255,255,255,0.75);
+  color: #334155;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.index-page .index-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(14,165,233,0.55);
+  box-shadow: 0 6px 16px rgba(15,23,42,0.06);
+}
+
+/* Add a thin gradient highlight to key cards */
+.index-page .accent-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.index-page .accent-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent3));
+}
+
+/* Make project cards more colorful but still elegant */
+.index-page a.card.portfolio-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.index-page a.card.portfolio-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, rgba(14,165,233,0.95), rgba(99,102,241,0.95));
+}
+
+.index-page a.card.portfolio-card:hover::before {
+  background: linear-gradient(90deg, rgba(34,197,94,0.95), rgba(14,165,233,0.95));
+}
+
+/* Social icon buttons: slightly richer */
+.index-page .social-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px !important;
+  border: 1px solid rgba(148,163,184,0.55) !important;
+  background: rgba(255,255,255,0.75) !important;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.index-page .social-icon:hover {
+  transform: translateY(-2px);
+  border-color: rgba(14,165,233,0.55) !important;
+  box-shadow: 0 10px 24px rgba(15,23,42,0.08);
+}
+
+/* Slightly stronger headings for index */
+.index-page .index-h1 {
+  background: linear-gradient(90deg, #0f172a 0%, #0f172a 50%, rgba(99,102,241,0.95) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+}
+
+/* Make the "deliver" items feel like pills/cards */
+.index-page .index-deliver-item {
+  background: rgba(255,255,255,0.75);
+  border: 1px solid rgba(148,163,184,0.35);
+}
+
+.index-page .index-deliver-ico {
+  background: rgba(14,165,233,0.12);
+  border: 1px solid rgba(14,165,233,0.28);
+  color: #0369a1;
+  font-weight: 800;
+}
+
+/* Small colorful badges */
+.index-page .badge-soft {
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-weight: 700;
+  font-size: 0.78rem;
+  border: 1px solid rgba(148,163,184,0.45);
+  background: rgba(255,255,255,0.7);
+}
+
+.index-page .badge-sky {
+  background: rgba(14,165,233,0.12);
+  border-color: rgba(14,165,233,0.25);
+  color: #0369a1;
+}
+
+.index-page .badge-indigo {
+  background: rgba(99,102,241,0.12);
+  border-color: rgba(99,102,241,0.22);
+  color: #3730a3;
+}
+
+.index-page .badge-green {
+  background: rgba(34,197,94,0.12);
+  border-color: rgba(34,197,94,0.22);
+  color: #166534;
+}
+
+
+@media (max-width: 992px) {
+  .index-chip-row { justify-content: flex-start; }
+  .index-project-grid { grid-template-columns: 1fr; }
+}
+
+
 @media (max-width: 1200px) {
   .sales-kpi-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
 }

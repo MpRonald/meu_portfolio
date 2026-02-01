@@ -11,13 +11,13 @@
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
   >
 
-  <!-- Bootstrap Icons (optional) -->
+  <!-- Bootstrap Icons -->
   <link
     rel="stylesheet"
     href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
   >
 
-  <!-- Your CSS (theme) -->
+  <!-- Theme CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
   {% block head %}{% endblock %}
@@ -31,15 +31,18 @@
 
       <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url_for('index') }}">
         <i class="bi bi-bar-chart-fill"></i>
-        <span>Ronaldo · Portfolio</span>
+        <span>Ronald · Portfolio</span>
       </a>
 
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-label="Toggle navigation">
+      <button class="navbar-toggler" type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#mainNav"
+              aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
 
       <div class="collapse navbar-collapse" id="mainNav">
-        <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2 mt-3 mt-lg-0">
+        <ul class="navbar-nav ms-auto mt-3 mt-lg-0">
 
           <li class="nav-item">
             <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}"
@@ -48,54 +51,9 @@
             </a>
           </li>
 
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint == 'ames_dashboard' %}active{% endif %}"
-               href="{{ url_for('ames_dashboard') }}">
-              <i class="bi bi-bar-chart-line me-1"></i> Ames
-            </a>
-          </li>
-
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint == 'sales_dashboard' %}active{% endif %}"
-               href="{{ url_for('sales_dashboard') }}">
-              <i class="bi bi-graph-up-arrow me-1"></i> Sales
-            </a>
-          </li>
-
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint == 'data_cleaner' %}active{% endif %}"
-               href="{{ url_for('data_cleaner') }}">
-              <i class="bi bi-magic me-1"></i> Cleaner
-            </a>
-          </li>
-
-          <!-- Optional: small external links dropdown -->
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              <i class="bi bi-link-45deg me-1"></i> Links
-            </a>
-            <ul class="dropdown-menu dropdown-menu-end">
-              <li>
-                <a class="dropdown-item" href="{{ url_for('healthz') }}" target="_blank" rel="noopener">
-                  <i class="bi bi-heart-pulse me-2"></i> Health check
-                </a>
-              </li>
-              <li><hr class="dropdown-divider"></li>
-              <li>
-                <a class="dropdown-item" href="https://github.com/" target="_blank" rel="noopener">
-                  <i class="bi bi-github me-2"></i> GitHub
-                </a>
-              </li>
-              <li>
-                <a class="dropdown-item" href="https://www.linkedin.com/" target="_blank" rel="noopener">
-                  <i class="bi bi-linkedin me-2"></i> LinkedIn
-                </a>
-              </li>
-            </ul>
-          </li>
-
         </ul>
       </div>
+
     </div>
   </nav>
 
@@ -103,7 +61,7 @@
   <main class="py-4">
     <div class="container-xl">
 
-      {# Optional flash messages if you use flash() in Flask #}
+      {# Flash messages #}
       {% with messages = get_flashed_messages() %}
         {% if messages %}
           <div class="mb-3">
