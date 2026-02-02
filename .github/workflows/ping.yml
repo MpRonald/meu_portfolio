@@ -10,7 +10,36 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Render app
+      - name: Ping Render app (robust)
+        shell: bash
         run: |
-          echo "Pinging Render app..."
-          curl -I --max-time 10 --retry 2 --retry-delay 3 https://www.ronaldpio.pt/healthz
+          set -e
+
+          URL="https://www.ronaldpio.pt/healthz"
+          echo "Pinging: $URL"
+
+          # 8 tentativas com espera (aguenta cold start)
+          for i in 1 2 3 4 5 6 7 8; do
+            echo "Attempt $i..."
+
+            # Faz GET, segue redirect, timeout maior
+            code=$(curl -L -sS -o /dev/null -w "%{http_code}" \
+              --connect-timeout 10 --max-time 45 \
+              -H "User-Agent: keep-render-awake" \
+              "$URL" || echo "000")
+
+            echo "HTTP $code"
+
+            # aceita 200-399
+            if [ "$code" -ge 200 ] && [ "$code" -lt 400 ]; then
+              echo "OK ✅"
+              exit 0
+            fi
+
+            echo "Not ready yet. Waiting 15s..."
+            sleep 15
+          done
+
+          echo "Ping failed after retries ❌"
+          exit 1
+

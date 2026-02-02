@@ -8,9 +8,16 @@
 
   <!-- HERO -->
   <section class="sales-hero mb-4 fade-in-up">
+    <div class="text-center mb-3">
+      <span class="page-section-head">
+        <span class="page-section-dot"></span>
+        <span class="fw-semibold">Sales & BI</span>
+      </span>
+    </div>
+
     <div class="sales-hero-inner">
       <div>
-        <div class="sales-kicker">BI DASHBOARD · WALMART SALES</div>
+        <div class="sales-kicker">BI DASHBOARD · SALES</div>
         <h1 class="sales-h1">Sales Performance & Store Comparison</h1>
         <p class="sales-subtitle">
           Explore revenue, units sold, promotions, stockouts, demand forecast accuracy and product mix.
@@ -30,8 +37,15 @@
   </section>
 
   <!-- FILTERS -->
-  <section class="card sales-panel mb-4 fade-in-up">
+  <section class="card sales-panel mb-4 fade-in-up accent-card">
     <div class="card-body">
+      <div class="text-center mb-3">
+        <span class="page-section-head">
+          <span class="page-section-dot"></span>
+          <span class="fw-semibold">Filters</span>
+        </span>
+      </div>
+
       <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
         <div>
           <h2 class="sales-h2 mb-1">Filters</h2>
@@ -160,49 +174,49 @@
 
   <!-- KPI GRID -->
   <section class="sales-kpi-grid mb-4 fade-in-up">
-    <div class="card sales-kpi"><div class="card-body">
+    <div class="card sales-kpi accent-card"><div class="card-body">
       <div class="sales-kpi-label">Revenue</div>
       <div class="sales-kpi-value sales-mono">{{ kpis.revenue }}</div>
       <div class="text-muted small sales-kpi-foot">Total revenue</div>
     </div></div>
 
-    <div class="card sales-kpi"><div class="card-body">
+    <div class="card sales-kpi accent-card"><div class="card-body">
       <div class="sales-kpi-label">Transactions</div>
       <div class="sales-kpi-value sales-mono">{{ kpis.transactions }}</div>
       <div class="text-muted small sales-kpi-foot">Rows in scope</div>
     </div></div>
 
-    <div class="card sales-kpi"><div class="card-body">
+    <div class="card sales-kpi accent-card"><div class="card-body">
       <div class="sales-kpi-label">Units sold</div>
       <div class="sales-kpi-value sales-mono">{{ kpis.units }}</div>
       <div class="text-muted small sales-kpi-foot">Total quantity</div>
     </div></div>
 
-    <div class="card sales-kpi"><div class="card-body">
+    <div class="card sales-kpi accent-card"><div class="card-body">
       <div class="sales-kpi-label">Avg order value</div>
       <div class="sales-kpi-value sales-mono">{{ kpis.aov }}</div>
       <div class="text-muted small sales-kpi-foot">Revenue / transactions</div>
     </div></div>
 
-    <div class="card sales-kpi"><div class="card-body">
+    <div class="card sales-kpi accent-card"><div class="card-body">
       <div class="sales-kpi-label">Promo share</div>
       <div class="sales-kpi-value sales-mono">{{ kpis.promo_share }}</div>
       <div class="text-muted small sales-kpi-foot">Orders with promotion</div>
     </div></div>
 
-    <div class="card sales-kpi"><div class="card-body">
+    <div class="card sales-kpi accent-card"><div class="card-body">
       <div class="sales-kpi-label">Stockout rate</div>
       <div class="sales-kpi-value sales-mono">{{ kpis.stockout_rate }}</div>
       <div class="text-muted small sales-kpi-foot">Supply risk</div>
     </div></div>
 
-    <div class="card sales-kpi"><div class="card-body">
+    <div class="card sales-kpi accent-card"><div class="card-body">
       <div class="sales-kpi-label">Forecast MAPE</div>
       <div class="sales-kpi-value sales-mono">{{ kpis.mape }}</div>
       <div class="text-muted small sales-kpi-foot">Forecast accuracy</div>
     </div></div>
 
-    <div class="card sales-kpi"><div class="card-body">
+    <div class="card sales-kpi accent-card"><div class="card-body">
       <div class="sales-kpi-label">Avg unit price</div>
       <div class="sales-kpi-value sales-mono">{{ kpis.avg_unit_price }}</div>
       <div class="text-muted small sales-kpi-foot">Mean price</div>
@@ -211,12 +225,12 @@
 
   <!-- COMPARISON SECTION -->
   {% if compare %}
-  <section class="card sales-card mb-4 fade-in-up">
+  <section class="card sales-card mb-4 fade-in-up accent-card">
     <div class="card-body">
       <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
         <div>
-          <h3 class="sales-h3 mb-1">Store comparison</h3>
-          <p class="text-muted small mb-0">
+          <h3 class="sales-h3 mb-1 text-center">Store comparison</h3>
+          <p class="text-muted small mb-0 text-center">
             Comparing <strong>{{ compare.store_a }}</strong> vs <strong>{{ compare.store_b }}</strong>
           </p>
         </div>
@@ -264,10 +278,10 @@
   <section class="row g-4 mb-4 fade-in-up">
 
     <div class="col-lg-8">
-      <div class="card sales-card">
+      <div class="card sales-card accent-card">
         <div class="card-body">
-          <h3 class="sales-h3 mb-1">Revenue trend</h3>
-          <p class="text-muted small mb-0">Monthly revenue evolution (selected scope)</p>
+          <h3 class="sales-h3 mb-1 text-center">Revenue trend</h3>
+          <p class="text-muted small mb-0 text-center">Monthly revenue evolution (selected scope)</p>
           <div class="sales-chart mt-3">
             <div id="sales_rev_trend" class="sales-plot"></div>
           </div>
@@ -276,10 +290,10 @@
     </div>
 
     <div class="col-lg-4">
-      <div class="card sales-card">
+      <div class="card sales-card accent-card">
         <div class="card-body">
-          <h3 class="sales-h3 mb-1">Revenue by category</h3>
-          <p class="text-muted small mb-0">Contribution per category</p>
+          <h3 class="sales-h3 mb-1 text-center">Revenue by category</h3>
+          <p class="text-muted small mb-0 text-center">Contribution per category</p>
           <div class="sales-chart mt-3">
             <div id="sales_rev_category" class="sales-plot"></div>
           </div>
@@ -288,10 +302,10 @@
     </div>
 
     <div class="col-lg-6">
-      <div class="card sales-card">
+      <div class="card sales-card accent-card">
         <div class="card-body">
-          <h3 class="sales-h3 mb-1">Top products</h3>
-          <p class="text-muted small mb-0">Highest revenue items</p>
+          <h3 class="sales-h3 mb-1 text-center">Top products</h3>
+          <p class="text-muted small mb-0 text-center">Highest revenue items</p>
           <div class="sales-chart mt-3">
             <div id="sales_top_products" class="sales-plot"></div>
           </div>
@@ -300,10 +314,10 @@
     </div>
 
     <div class="col-lg-6">
-      <div class="card sales-card">
+      <div class="card sales-card accent-card">
         <div class="card-body">
-          <h3 class="sales-h3 mb-1">Store performance</h3>
-          <p class="text-muted small mb-0">Top stores by revenue</p>
+          <h3 class="sales-h3 mb-1 text-center">Store performance</h3>
+          <p class="text-muted small mb-0 text-center">Top stores by revenue</p>
           <div class="sales-chart mt-3">
             <div id="sales_top_stores" class="sales-plot"></div>
           </div>
@@ -312,10 +326,10 @@
     </div>
 
     <div class="col-lg-5">
-      <div class="card sales-card">
+      <div class="card sales-card accent-card">
         <div class="card-body">
-          <h3 class="sales-h3 mb-1">Payment mix</h3>
-          <p class="text-muted small mb-0">Share by payment method</p>
+          <h3 class="sales-h3 mb-1 text-center">Payment mix</h3>
+          <p class="text-muted small mb-0 text-center">Share by payment method</p>
           <div class="sales-chart mt-3">
             <div id="sales_payment_mix" class="sales-plot"></div>
           </div>
@@ -324,10 +338,10 @@
     </div>
 
     <div class="col-lg-7">
-      <div class="card sales-card">
+      <div class="card sales-card accent-card">
         <div class="card-body">
-          <h3 class="sales-h3 mb-1">Forecast vs actual demand</h3>
-          <p class="text-muted small mb-0">Demand planning quality signal</p>
+          <h3 class="sales-h3 mb-1 text-center">Forecast vs actual demand</h3>
+          <p class="text-muted small mb-0 text-center">Demand planning quality signal</p>
           <div class="sales-chart mt-3">
             <div id="sales_forecast_scatter" class="sales-plot"></div>
           </div>
@@ -338,10 +352,10 @@
   </section>
 
   <!-- DETAILS TABLE -->
-  <section class="card sales-card mb-4 fade-in-up">
+  <section class="card sales-card mb-4 fade-in-up accent-card">
     <div class="card-body">
-      <h3 class="sales-h3 mb-1">Quick view</h3>
-      <p class="text-muted small mb-0">Sample of filtered rows</p>
+      <h3 class="sales-h3 mb-1 text-center">Quick view</h3>
+      <p class="text-muted small mb-0 text-center">Sample of filtered rows</p>
 
       <div class="sales-table-wrap mt-3">
         <div class="table-responsive sales-table-inner">

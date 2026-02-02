@@ -6,13 +6,19 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-<!-- Plotly (only this page needs it) -->
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 
 <div class="container-xl ames-page" style="max-width: 1200px;">
 
   <!-- HERO -->
   <section class="ames-hero mb-4 fade-in-up">
+    <div class="text-center mb-3">
+      <span class="page-section-head">
+        <span class="page-section-dot"></span>
+        <span class="fw-semibold">Real Estate</span>
+      </span>
+    </div>
+
     <div class="ames-hero-inner">
       <div class="ames-hero-title">
         <div class="ames-kicker">EXECUTIVE DASHBOARD · REAL ESTATE</div>
@@ -35,8 +41,15 @@
   </section>
 
   <!-- FILTER PANEL -->
-  <section class="card ames-panel mb-4 fade-in-up">
+  <section class="card ames-panel mb-4 fade-in-up accent-card">
     <div class="card-body">
+      <div class="text-center mb-3">
+        <span class="page-section-head">
+          <span class="page-section-dot"></span>
+          <span class="fw-semibold">Filters</span>
+        </span>
+      </div>
+
       <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">
         <div>
           <h2 class="ames-h2 mb-1">Filters</h2>
@@ -102,8 +115,15 @@
   </section>
 
   <!-- EXEC SUMMARY -->
-  <section class="card ames-card mb-4 fade-in-up">
+  <section class="card ames-card mb-4 fade-in-up accent-card">
     <div class="card-body">
+      <div class="text-center mb-3">
+        <span class="page-section-head">
+          <span class="page-section-dot"></span>
+          <span class="fw-semibold">Summary</span>
+        </span>
+      </div>
+
       <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
         <div>
           <h3 class="ames-h3 mb-1">Executive summary</h3>
@@ -168,9 +188,16 @@
 
   <!-- KPI GRID -->
   <section class="mb-4 fade-in-up">
+    <div class="text-center mb-3">
+      <span class="page-section-head">
+        <span class="page-section-dot"></span>
+        <span class="fw-semibold">KPIs</span>
+      </span>
+    </div>
+
     <div class="row g-3">
       <div class="col-md-3">
-        <div class="card ames-kpi h-100">
+        <div class="card ames-kpi h-100 accent-card">
           <div class="card-body">
             <div class="ames-kpi-label">Sample size</div>
             <div class="ames-kpi-value ames-mono">{{ estatisticas.n }}</div>
@@ -180,7 +207,7 @@
       </div>
 
       <div class="col-md-3">
-        <div class="card ames-kpi h-100">
+        <div class="card ames-kpi h-100 accent-card">
           <div class="card-body">
             <div class="ames-kpi-label">Typical price (median)</div>
             <div class="ames-kpi-value ames-mono">
@@ -192,7 +219,7 @@
       </div>
 
       <div class="col-md-3">
-        <div class="card ames-kpi h-100">
+        <div class="card ames-kpi h-100 accent-card">
           <div class="card-body">
             <div class="ames-kpi-label">Average price</div>
             <div class="ames-kpi-value ames-mono">
@@ -204,7 +231,7 @@
       </div>
 
       <div class="col-md-3">
-        <div class="card ames-kpi h-100">
+        <div class="card ames-kpi h-100 accent-card">
           <div class="card-body">
             <div class="ames-kpi-label">Price dispersion (IQR)</div>
             <div class="ames-kpi-value ames-mono">
@@ -218,7 +245,7 @@
 
     <div class="row g-3 mt-0">
       <div class="col-md-3">
-        <div class="card ames-kpi h-100">
+        <div class="card ames-kpi h-100 accent-card">
           <div class="card-body">
             <div class="ames-kpi-label">Min / Max</div>
             <div class="ames-kpi-value ames-mono">
@@ -234,7 +261,7 @@
       </div>
 
       <div class="col-md-3">
-        <div class="card ames-kpi h-100">
+        <div class="card ames-kpi h-100 accent-card">
           <div class="card-body">
             <div class="ames-kpi-label">Volatility (Std. dev.)</div>
             <div class="ames-kpi-value ames-mono">
@@ -246,7 +273,7 @@
       </div>
 
       <div class="col-md-3">
-        <div class="card ames-kpi h-100">
+        <div class="card ames-kpi h-100 accent-card">
           <div class="card-body">
             <div class="ames-kpi-label">Skewness</div>
             <div class="ames-kpi-value ames-mono">
@@ -258,7 +285,7 @@
       </div>
 
       <div class="col-md-3">
-        <div class="card ames-kpi h-100">
+        <div class="card ames-kpi h-100 accent-card">
           <div class="card-body">
             <div class="ames-kpi-label">Kurtosis</div>
             <div class="ames-kpi-value ames-mono">
@@ -274,7 +301,7 @@
   <!-- INSIGHTS -->
   <section class="row g-3 mb-4 fade-in-up">
     <div class="col-lg-6">
-      <div class="card ames-card h-100">
+      <div class="card ames-card h-100 accent-card">
         <div class="card-body">
           <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
             <div>
@@ -353,7 +380,7 @@
     </div>
 
     <div class="col-lg-6">
-      <div class="card ames-card h-100">
+      <div class="card ames-card h-100 accent-card">
         <div class="card-body">
           <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
             <div>
@@ -444,10 +471,10 @@
   <!-- CORE CHARTS -->
   <section class="row g-3 mb-4 fade-in-up">
     <div class="col-lg-7">
-      <div class="card ames-card h-100">
+      <div class="card ames-card h-100 accent-card">
         <div class="card-body">
-          <h3 class="ames-h3 mb-1">Distribution — {{ nomes_amigaveis[variavel_selecionada] }}</h3>
-          <p class="text-muted small mb-0">Typical range and concentration of values.</p>
+          <h3 class="ames-h3 mb-1 text-center">Distribution — {{ nomes_amigaveis[variavel_selecionada] }}</h3>
+          <p class="text-muted small mb-0 text-center">Typical range and concentration of values.</p>
           <div class="ames-chart mt-3">
             <div id="histograma" class="ames-plot"></div>
           </div>
@@ -456,10 +483,10 @@
     </div>
 
     <div class="col-lg-5">
-      <div class="card ames-card h-100">
+      <div class="card ames-card h-100 accent-card">
         <div class="card-body">
-          <h3 class="ames-h3 mb-1">Outliers and spread</h3>
-          <p class="text-muted small mb-0">Extremes + middle 50% in a single view.</p>
+          <h3 class="ames-h3 mb-1 text-center">Outliers and spread</h3>
+          <p class="text-muted small mb-0 text-center">Extremes + middle 50% in a single view.</p>
           <div class="ames-chart mt-3">
             <div id="boxplot" class="ames-plot"></div>
           </div>
@@ -471,10 +498,10 @@
   <!-- DRIVER IMPACT -->
   <section class="row g-3 mb-4 fade-in-up">
     <div class="col-lg-7">
-      <div class="card ames-card h-100">
+      <div class="card ames-card h-100 accent-card">
         <div class="card-body">
-          <h3 class="ames-h3 mb-1">Price vs {{ nomes_amigaveis[variavel_selecionada] }}</h3>
-          <p class="text-muted small mb-0">Visual relationship between the driver and price.</p>
+          <h3 class="ames-h3 mb-1 text-center">Price vs {{ nomes_amigaveis[variavel_selecionada] }}</h3>
+          <p class="text-muted small mb-0 text-center">Visual relationship between the driver and price.</p>
           <div class="ames-chart mt-3">
             <div id="scatter_preco" class="ames-plot"></div>
           </div>
@@ -483,10 +510,10 @@
     </div>
 
     <div class="col-lg-5">
-      <div class="card ames-card h-100">
+      <div class="card ames-card h-100 accent-card">
         <div class="card-body">
-          <h3 class="ames-h3 mb-1">{{ nomes_amigaveis[variavel_selecionada] }} by segment</h3>
-          <p class="text-muted small mb-0">Segment-based policy view.</p>
+          <h3 class="ames-h3 mb-1 text-center">{{ nomes_amigaveis[variavel_selecionada] }} by segment</h3>
+          <p class="text-muted small mb-0 text-center">Segment-based policy view.</p>
           <div class="ames-chart mt-3">
             <div id="boxplot_faixa" class="ames-plot"></div>
           </div>
@@ -496,17 +523,12 @@
   </section>
 
   <!-- CORRELATION MATRIX -->
-  <section class="card ames-card mb-4 fade-in-up">
+  <section class="card ames-card mb-4 fade-in-up accent-card">
     <div class="card-body">
-      <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
-        <div>
-          <h3 class="ames-h3 mb-1">Correlation matrix</h3>
-          <p class="text-muted small mb-0">
-            “What moves with what” view to spot drivers and redundancy.
-          </p>
-        </div>
-        <span class="badge ames-badge ames-badge-neutral">Overview</span>
-      </div>
+      <h3 class="ames-h3 mb-1 text-center">Correlation matrix</h3>
+      <p class="text-muted small mb-0 text-center">
+        “What moves with what” view to spot drivers and redundancy.
+      </p>
 
       <div class="ames-chart mt-3">
         <div id="heatmap_corr" class="ames-plot ames-plot-tall"></div>
@@ -516,10 +538,10 @@
 
   <!-- NEIGHBORHOODS -->
   {% if graph_box_bairro_json %}
-  <section class="card ames-card mb-4 fade-in-up">
+  <section class="card ames-card mb-4 fade-in-up accent-card">
     <div class="card-body">
-      <h3 class="ames-h3 mb-1">Neighborhood comparison</h3>
-      <p class="text-muted small mb-0">Identify premium neighborhoods and dispersion patterns.</p>
+      <h3 class="ames-h3 mb-1 text-center">Neighborhood comparison</h3>
+      <p class="text-muted small mb-0 text-center">Identify premium neighborhoods and dispersion patterns.</p>
 
       <div class="ames-chart mt-3">
         <div id="boxplot_bairro" class="ames-plot ames-plot-tall"></div>
@@ -527,8 +549,8 @@
 
       {% if graph_bar_bairro_json %}
       <hr class="ames-hr my-4">
-      <h3 class="ames-h3 mb-1">Average price ranking (Top 20)</h3>
-      <p class="text-muted small mb-0">Quick ranking to support geo-based pricing strategy.</p>
+      <h3 class="ames-h3 mb-1 text-center">Average price ranking (Top 20)</h3>
+      <p class="text-muted small mb-0 text-center">Quick ranking to support geo-based pricing strategy.</p>
       <div class="ames-chart mt-3">
         <div id="bar_bairro" class="ames-plot ames-plot-tall"></div>
       </div>
@@ -538,10 +560,10 @@
   {% endif %}
 
   <!-- YEAR BUILT -->
-  <section class="card ames-card mb-4 fade-in-up">
+  <section class="card ames-card mb-4 fade-in-up accent-card">
     <div class="card-body">
-      <h3 class="ames-h3 mb-1">Price vs Year Built</h3>
-      <p class="text-muted small mb-0">Appreciation patterns and vintage effects.</p>
+      <h3 class="ames-h3 mb-1 text-center">Price vs Year Built</h3>
+      <p class="text-muted small mb-0 text-center">Appreciation patterns and vintage effects.</p>
       <div class="ames-chart mt-3">
         <div id="scatter_preco_ano" class="ames-plot ames-plot-tall"></div>
       </div>
@@ -549,10 +571,10 @@
   </section>
 
   <!-- MAP -->
-  <section class="card ames-card mb-2 fade-in-up">
+  <section class="card ames-card mb-2 fade-in-up accent-card">
     <div class="card-body">
-      <h3 class="ames-h3 mb-1">Geographic distribution</h3>
-      <p class="text-muted small mb-0">Spatial market view of the current scope.</p>
+      <h3 class="ames-h3 mb-1 text-center">Geographic distribution</h3>
+      <p class="text-muted small mb-0 text-center">Spatial market view of the current scope.</p>
       <div class="ames-chart mt-3">
         <div id="mapa_imoveis" class="ames-plot ames-plot-map"></div>
       </div>
@@ -574,13 +596,11 @@
     Plotly.newPlot(divId, fig.data, fig.layout, PLOT_CONFIG);
   }
 
-  // Core charts (required)
   const histData = {{ graph_hist_json | safe }};
   const boxData  = {{ graph_box_json  | safe }};
   safePlot("histograma", histData);
   safePlot("boxplot", boxData);
 
-  // Optional charts
   {% if graph_scatter_json %}
     safePlot("scatter_preco", {{ graph_scatter_json | safe }});
   {% endif %}
@@ -609,7 +629,6 @@
     safePlot("mapa_imoveis", {{ graph_map_json | safe }});
   {% endif %}
 
-  // Bootstrap tooltips
   const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
   [...tooltipTriggerList].map(el => new bootstrap.Tooltip(el));
 </script>

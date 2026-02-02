@@ -1,313 +1,359 @@
 {% extends "base.html" %}
+{% block title %}Data Cleaner & Quality Report{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width: 1100px; padding: 28px 16px;">
-  <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap;">
-    <div>
-      <h1 style="margin:0 0 6px 0;">Data Cleaner & Quality Report</h1>
-      <p style="margin:0; opacity:0.85;">
+<div class="container-xl cleaner-page" style="max-width: 1100px;">
+
+  <!-- HERO -->
+  <section class="cleaner-hero p-4 p-lg-5 mb-4 fade-in-up">
+    <div class="text-center mb-3">
+      <span class="page-section-head">
+        <span class="page-section-dot"></span>
+        <span class="fw-semibold">Data Quality</span>
+      </span>
+    </div>
+
+    <div class="text-center">
+      <div class="cleaner-kicker mb-2">DATA CLEANER · QUALITY REPORT</div>
+      <h1 class="mb-2">Data Cleaner & Quality Report</h1>
+      <p class="text-muted mb-3" style="max-width: 820px; margin: 0 auto;">
         Upload a <strong>CSV</strong> or <strong>Excel</strong> file. The app cleans the dataset and generates
         a <strong>cleaned Excel</strong> + a <strong>PDF quality report</strong>.
       </p>
-      <p style="margin:8px 0 0 0; opacity:0.85;">
-        <strong>Upload limit:</strong> {{ max_upload_mb }}MB.
-      </p>
+      <div class="text-muted small">
+        <strong>Upload limit:</strong> {{ max_upload_mb }}MB · Route: <code>/cleaner</code>
+      </div>
     </div>
-    <div style="opacity:0.7; font-size: 0.95rem;">
-      Route: <code>/cleaner</code>
+  </section>
+
+  <!-- UPLOAD -->
+  <section class="card mb-4 fade-in-up accent-card">
+    <div class="card-body">
+      <div class="text-center mb-3">
+        <span class="page-section-head">
+          <span class="page-section-dot"></span>
+          <span class="fw-semibold">Upload</span>
+        </span>
+      </div>
+
+      <form method="POST" enctype="multipart/form-data" id="uploadForm" class="row g-3 align-items-end">
+        <div class="col-lg-7">
+          <label class="form-label fw-semibold" for="fileInput">Choose file</label>
+
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <label class="btn btn-outline-secondary mb-0">
+          <i class="bi bi-upload me-1"></i> Choose file
+          <input
+            type="file"
+            name="file"
+            id="fileInput"
+            accept=".csv,.txt,.xlsx,.xls"
+            hidden
+            required
+          />
+        </label>
+
+  <span id="fileName" class="text-muted small">
+    No file selected
+  </span>
+</div>
+
+          <div class="form-text">
+            Supported: CSV, XLSX, XLS • Max size: <strong>{{ max_upload_mb }}MB</strong>
+          </div>
+        </div>
+
+        <div class="col-lg-5 d-flex gap-2">
+          <button type="submit" id="btnSubmit" class="btn btn-primary w-100">
+            Clean & Generate Report
+          </button>
+
+          <a href="{{ url_for('data_cleaner') }}" class="btn btn-secondary w-100" title="Clear result and go back">
+            Reset
+          </a>
+        </div>
+
+        <div class="col-12">
+          <div id="uploadStatus" class="text-muted small"></div>
+        </div>
+      </form>
+
+      {% if error %}
+        <div class="alert alert-danger mt-3 mb-0">
+          <strong>Error:</strong> {{ error }}
+        </div>
+      {% endif %}
     </div>
-  </div>
+  </section>
 
-  <div style="height:14px;"></div>
+  <!-- DEMO (when no result) -->
+  {% if not result %}
+  <section class="card mb-4 fade-in-up accent-card">
+    <div class="card-body">
+      <div class="text-center mb-3">
+        <span class="page-section-head">
+          <span class="page-section-dot"></span>
+          <span class="fw-semibold">Demo</span>
+        </span>
+      </div>
 
-  <!-- Upload card -->
-  <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:18px; background: rgba(255,255,255,0.03);">
-    <form method="POST" enctype="multipart/form-data" id="uploadForm">
-      <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-        <input
-          type="file"
-          name="file"
-          id="fileInput"
-          accept=".csv,.txt,.xlsx,.xls"
-          style="flex:1; min-width:260px; padding:10px; border-radius:10px; border:1px dashed rgba(255,255,255,0.25); background:rgba(0,0,0,0.08);"
-          required
-        />
-
-        <button
-          type="submit"
-          id="btnSubmit"
-          style="padding:10px 14px; border-radius:10px; border:0; cursor:pointer; font-weight:600;"
-        >
-          Clean & Generate Report
-        </button>
-
-        <a
-          href="{{ url_for('data_cleaner') }}"
-          style="padding:10px 14px; border-radius:10px; text-decoration:none; font-weight:700; border:1px solid rgba(255,255,255,0.18);"
-          title="Clear result and go back"
-        >
-          Clear
+      <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
+        <div>
+          <h3 class="h5 mb-1">Demo dataset (preview)</h3>
+          <div class="text-muted small">
+            File: <strong>{{ demo.meta.filename }}</strong> · Rows: {{ demo.meta.rows }} · Cols: {{ demo.meta.cols }}
+          </div>
+        </div>
+        <a class="btn btn-outline-secondary" href="{{ url_for('cleaner_demo_download') }}">
+          Download demo CSV
         </a>
       </div>
 
-      <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
-        <div style="opacity:0.8; font-size:0.95rem;">
-          Supported: CSV, XLSX, XLS • Max size: <strong>{{ max_upload_mb }}MB</strong>
-        </div>
-        <div id="uploadStatus" style="opacity:0.85; font-size:0.95rem;"></div>
-      </div>
-    </form>
-
-    {% if error %}
-      <div style="margin-top:14px; padding:12px; border-radius:10px; background: rgba(255, 70, 70, 0.12); border: 1px solid rgba(255, 70, 70, 0.35);">
-        <strong>Error:</strong> {{ error }}
-      </div>
-    {% endif %}
-  </div>
-
-  <div style="height:18px;"></div>
-
-  <!-- ✅ DEMO SECTION (always visible when no result) -->
-  {% if not result %}
-  <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:16px; background: rgba(255,255,255,0.03);">
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
-      <div>
-        <h3 style="margin:0 0 6px 0;">Demo dataset (preview)</h3>
-        <div style="opacity:0.8; font-size:0.95rem;">
-          File: <strong>{{ demo.meta.filename }}</strong> · Rows: {{ demo.meta.rows }} · Cols: {{ demo.meta.cols }}
-        </div>
-      </div>
-      <a href="{{ url_for('cleaner_demo_download') }}"
-         style="display:inline-block; padding:10px 14px; border-radius:10px; text-decoration:none; font-weight:700; border:1px solid rgba(255,255,255,0.18);">
-        Download demo CSV
-      </a>
-    </div>
-
-    <div style="height:12px;"></div>
-
-    <div style="overflow:auto; border-radius:10px; border:1px solid rgba(255,255,255,0.10);">
-      <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
-        <thead style="background: rgba(255,255,255,0.06);">
-          <tr>
-            {% for c in demo.table.columns %}
-              <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,0.10); white-space:nowrap;">
-                {{ c }}
-              </th>
-            {% endfor %}
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in demo.table.rows %}
+      <div class="table-responsive mt-3" style="border:1px solid rgba(226,232,240,1); border-radius: 14px; overflow:hidden;">
+        <table class="table table-sm mb-0 align-middle">
+          <thead>
             <tr>
-              {% for cell in row %}
-                <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
-                  {{ cell }}
-                </td>
+              {% for c in demo.table.columns %}
+                <th class="text-nowrap">{{ c }}</th>
               {% endfor %}
             </tr>
-          {% endfor %}
-          {% if demo.table.rows|length == 0 %}
-            <tr>
-              <td colspan="{{ demo.table.columns|length }}" style="padding:12px; opacity:0.75;">
-                Demo not found. Put the file in <code>data/dirty_demo_dataset.csv</code>.
-              </td>
-            </tr>
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {% for row in demo.table.rows %}
+              <tr>
+                {% for cell in row %}
+                  <td class="text-nowrap">{{ cell }}</td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+            {% if demo.table.rows|length == 0 %}
+              <tr>
+                <td colspan="{{ demo.table.columns|length }}" class="text-muted">
+                  Demo not found. Put the file in <code>data/dirty_demo_dataset.csv</code>.
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
 
-    <div style="margin-top:10px; opacity:0.8; font-size:0.95rem;">
-      Tip: download the demo and upload it to see the cleaner report output.
+      <div class="text-muted small mt-2">
+        Tip: download the demo and upload it to see the cleaner report output.
+      </div>
     </div>
-  </div>
+  </section>
   {% endif %}
 
   {% if result %}
-    <!-- Summary cards -->
-    <div style="display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:12px;">
-      <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:14px; background: rgba(255,255,255,0.03);">
-        <div style="opacity:0.75;">Raw shape</div>
-        <div style="font-size:1.25rem; font-weight:700;">
-          {{ result.report.raw_rows }} × {{ result.report.raw_cols }}
-        </div>
-      </div>
-      <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:14px; background: rgba(255,255,255,0.03);">
-        <div style="opacity:0.75;">Clean shape</div>
-        <div style="font-size:1.25rem; font-weight:700;">
-          {{ result.report.clean_rows }} × {{ result.report.clean_cols }}
-        </div>
-      </div>
-      <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:14px; background: rgba(255,255,255,0.03);">
-        <div style="opacity:0.75;">Duplicates removed</div>
-        <div style="font-size:1.25rem; font-weight:700;">
-          {{ result.report.removed_duplicates }}
-        </div>
-      </div>
-      <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:14px; background: rgba(255,255,255,0.03);">
-        <div style="opacity:0.75;">Missing values</div>
-        <div style="font-size:1.1rem; font-weight:700;">
-          Raw: {{ "%.1f"|format(result.report.raw_missing_pct) }}%<br/>
-          Clean: {{ "%.1f"|format(result.report.clean_missing_pct) }}%
-        </div>
-      </div>
-    </div>
-
-    <div style="height:12px;"></div>
-
-    <!-- Download buttons -->
-    <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
-      <a href="{{ result.download_excel_url }}"
-         style="display:inline-block; padding:10px 14px; border-radius:10px; text-decoration:none; font-weight:700; border:1px solid rgba(255,255,255,0.18);">
-        Download cleaned Excel (.xlsx)
-      </a>
-      <a href="{{ result.download_pdf_url }}"
-         style="display:inline-block; padding:10px 14px; border-radius:10px; text-decoration:none; font-weight:700; border:1px solid rgba(255,255,255,0.18);">
-        Download quality report (PDF)
-      </a>
-
-      <div style="opacity:0.75; font-size:0.95rem; margin-left:auto;">
-        Source file: <strong>{{ result.meta.filename }}</strong>
-      </div>
-    </div>
-
-    <div style="height:14px;"></div>
-
-    <!-- Quick diagnostics -->
-    <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:16px; background: rgba(255,255,255,0.03);">
-      <h3 style="margin:0 0 8px 0;">Quick diagnostics</h3>
-
-      <div style="display:grid; grid-template-columns: 1.2fr 0.8fr; gap:14px;">
-        <div>
-          <div style="opacity:0.8; margin-bottom:6px;"><strong>Cleaned dtypes</strong></div>
-          <ul style="margin:0; padding-left:18px;">
-            {% for k, v in result.report.dtype_summary.items() %}
-              <li><code>{{ k }}</code> — {{ v }} column(s)</li>
-            {% endfor %}
-            {% if result.report.dtype_summary|length == 0 %}
-              <li>—</li>
-            {% endif %}
-          </ul>
-        </div>
-
-        <div>
-          <div style="opacity:0.8; margin-bottom:6px;"><strong>Most missing columns</strong></div>
-          <ul style="margin:0; padding-left:18px;">
-            {% for item in result.report.top_missing_cols %}
-              <li><code>{{ item.col }}</code> — {{ "%.1f"|format(item.missing_pct) }}%</li>
-            {% endfor %}
-            {% if result.report.top_missing_cols|length == 0 %}
-              <li>—</li>
-            {% endif %}
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <div style="height:14px;"></div>
-
-    <!-- ✅ Preview with TABS -->
-    <div style="border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:16px; background: rgba(255,255,255,0.03);">
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-        <h3 style="margin:0;">Preview (first 20 rows)</h3>
-
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button type="button" class="tabBtn" data-tab="before"
-                  style="padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.08); cursor:pointer; font-weight:700;">
-            Before (raw)
-          </button>
-          <button type="button" class="tabBtn" data-tab="after"
-                  style="padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:transparent; cursor:pointer; font-weight:700;">
-            After (cleaned)
-          </button>
-        </div>
+    <!-- SUMMARY -->
+    <section class="mb-4 fade-in-up">
+      <div class="text-center mb-3">
+        <span class="page-section-head">
+          <span class="page-section-dot"></span>
+          <span class="fw-semibold">Summary</span>
+        </span>
       </div>
 
-      <div style="height:10px;"></div>
-
-      <!-- BEFORE -->
-      <div class="tabPanel" id="tab-before">
-        <div style="opacity:0.85; font-size:0.95rem; margin-bottom:8px;">
-          Raw file preview (as uploaded).
+      <div class="row g-3">
+        <div class="col-md-3">
+          <div class="card h-100 accent-card"><div class="card-body">
+            <div class="text-muted small">Raw shape</div>
+            <div class="h5 fw-bold mb-0">{{ result.report.raw_rows }} × {{ result.report.raw_cols }}</div>
+          </div></div>
         </div>
 
-        <div style="overflow:auto; border-radius:10px; border:1px solid rgba(255,255,255,0.10);">
-          <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
-            <thead style="background: rgba(255,255,255,0.06);">
-              <tr>
-                {% for c in result.table_raw.columns %}
-                  <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,0.10); white-space:nowrap;">
-                    {{ c }}
-                  </th>
-                {% endfor %}
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in result.table_raw.rows %}
-                <tr>
-                  {% for cell in row %}
-                    <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
-                      {{ cell }}
-                    </td>
-                  {% endfor %}
-                </tr>
+        <div class="col-md-3">
+          <div class="card h-100 accent-card"><div class="card-body">
+            <div class="text-muted small">Clean shape</div>
+            <div class="h5 fw-bold mb-0">{{ result.report.clean_rows }} × {{ result.report.clean_cols }}</div>
+          </div></div>
+        </div>
+
+        <div class="col-md-3">
+          <div class="card h-100 accent-card"><div class="card-body">
+            <div class="text-muted small">Duplicates removed</div>
+            <div class="h5 fw-bold mb-0">{{ result.report.removed_duplicates }}</div>
+          </div></div>
+        </div>
+
+        <div class="col-md-3">
+          <div class="card h-100 accent-card"><div class="card-body">
+            <div class="text-muted small">Missing values</div>
+            <div class="fw-bold">
+              Raw: {{ "%.1f"|format(result.report.raw_missing_pct) }}%<br/>
+              Clean: {{ "%.1f"|format(result.report.clean_missing_pct) }}%
+            </div>
+          </div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DOWNLOADS -->
+    <section class="card mb-4 fade-in-up accent-card">
+      <div class="card-body">
+        <div class="text-center mb-3">
+          <span class="page-section-head">
+            <span class="page-section-dot"></span>
+            <span class="fw-semibold">Downloads</span>
+          </span>
+        </div>
+
+        <div class="d-flex gap-2 flex-wrap align-items-center justify-content-center">
+          <a class="btn btn-outline-secondary" href="{{ result.download_excel_url }}">
+            Download cleaned Excel (.xlsx)
+          </a>
+          <a class="btn btn-outline-secondary" href="{{ result.download_pdf_url }}">
+            Download quality report (PDF)
+          </a>
+        </div>
+
+        <div class="text-muted small text-center mt-2">
+          Source file: <strong>{{ result.meta.filename }}</strong>
+        </div>
+      </div>
+    </section>
+
+    <!-- DIAGNOSTICS -->
+    <section class="card mb-4 fade-in-up accent-card">
+      <div class="card-body">
+        <div class="text-center mb-3">
+          <span class="page-section-head">
+            <span class="page-section-dot"></span>
+            <span class="fw-semibold">Diagnostics</span>
+          </span>
+        </div>
+
+        <h3 class="h5 mb-3 text-center">Quick diagnostics</h3>
+
+        <div class="row g-4">
+          <div class="col-lg-7">
+            <div class="fw-semibold mb-2">Cleaned dtypes</div>
+            <ul class="text-muted small mb-0">
+              {% for k, v in result.report.dtype_summary.items() %}
+                <li><code>{{ k }}</code> — {{ v }} column(s)</li>
               {% endfor %}
-              {% if result.table_raw.rows|length == 0 %}
-                <tr>
-                  <td colspan="{{ result.table_raw.columns|length }}" style="padding:12px; opacity:0.75;">
-                    No rows to display.
-                  </td>
-                </tr>
+              {% if result.report.dtype_summary|length == 0 %}
+                <li>—</li>
               {% endif %}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </ul>
+          </div>
 
-      <!-- AFTER -->
-      <div class="tabPanel" id="tab-after" style="display:none;">
-        <div style="opacity:0.85; font-size:0.95rem; margin-bottom:8px;">
-          Cleaned preview (after trimming, parsing numeric/datetime, removing duplicates).
-        </div>
-
-        <div style="overflow:auto; border-radius:10px; border:1px solid rgba(255,255,255,0.10);">
-          <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
-            <thead style="background: rgba(255,255,255,0.06);">
-              <tr>
-                {% for c in result.table_clean.columns %}
-                  <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,0.10); white-space:nowrap;">
-                    {{ c }}
-                  </th>
-                {% endfor %}
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in result.table_clean.rows %}
-                <tr>
-                  {% for cell in row %}
-                    <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); white-space:nowrap;">
-                      {{ cell }}
-                    </td>
-                  {% endfor %}
-                </tr>
+          <div class="col-lg-5">
+            <div class="fw-semibold mb-2">Most missing columns</div>
+            <ul class="text-muted small mb-0">
+              {% for item in result.report.top_missing_cols %}
+                <li><code>{{ item.col }}</code> — {{ "%.1f"|format(item.missing_pct) }}%</li>
               {% endfor %}
-              {% if result.table_clean.rows|length == 0 %}
-                <tr>
-                  <td colspan="{{ result.table_clean.columns|length }}" style="padding:12px; opacity:0.75;">
-                    No rows to display.
-                  </td>
-                </tr>
+              {% if result.report.top_missing_cols|length == 0 %}
+                <li>—</li>
               {% endif %}
-            </tbody>
-          </table>
+            </ul>
+          </div>
         </div>
       </div>
+    </section>
 
-      <div style="margin-top:10px; opacity:0.8; font-size:0.95rem;">
-        Cleaning steps: trim strings • normalize column names • drop empty rows/cols • parse numeric/datetime • remove duplicates.
+    <!-- PREVIEW TABS -->
+    <section class="card mb-4 fade-in-up accent-card">
+      <div class="card-body">
+        <div class="text-center mb-3">
+          <span class="page-section-head">
+            <span class="page-section-dot"></span>
+            <span class="fw-semibold">Preview</span>
+          </span>
+        </div>
+
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <h3 class="h5 mb-0">Preview (first 20 rows)</h3>
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="button" class="btn btn-outline-secondary tabBtn is-active" data-tab="before">
+              Before (raw)
+            </button>
+            <button type="button" class="btn btn-outline-secondary tabBtn" data-tab="after">
+              After (cleaned)
+            </button>
+          </div>
+        </div>
+
+        <div class="mt-3">
+
+          <!-- BEFORE -->
+          <div class="tabPanel" id="tab-before">
+            <div class="text-muted small mb-2">Raw file preview (as uploaded).</div>
+
+            <div class="table-responsive" style="border:1px solid rgba(226,232,240,1); border-radius: 14px; overflow:hidden;">
+              <table class="table table-sm mb-0 align-middle">
+                <thead>
+                  <tr>
+                    {% for c in result.table_raw.columns %}
+                      <th class="text-nowrap">{{ c }}</th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in result.table_raw.rows %}
+                    <tr>
+                      {% for cell in row %}
+                        <td class="text-nowrap">{{ cell }}</td>
+                      {% endfor %}
+                    </tr>
+                  {% endfor %}
+                  {% if result.table_raw.rows|length == 0 %}
+                    <tr>
+                      <td colspan="{{ result.table_raw.columns|length }}" class="text-muted">
+                        No rows to display.
+                      </td>
+                    </tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- AFTER -->
+          <div class="tabPanel" id="tab-after" style="display:none;">
+            <div class="text-muted small mb-2">
+              Cleaned preview (after trimming, parsing numeric/datetime, removing duplicates).
+            </div>
+
+            <div class="table-responsive" style="border:1px solid rgba(226,232,240,1); border-radius: 14px; overflow:hidden;">
+              <table class="table table-sm mb-0 align-middle">
+                <thead>
+                  <tr>
+                    {% for c in result.table_clean.columns %}
+                      <th class="text-nowrap">{{ c }}</th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in result.table_clean.rows %}
+                    <tr>
+                      {% for cell in row %}
+                        <td class="text-nowrap">{{ cell }}</td>
+                      {% endfor %}
+                    </tr>
+                  {% endfor %}
+                  {% if result.table_clean.rows|length == 0 %}
+                    <tr>
+                      <td colspan="{{ result.table_clean.columns|length }}" class="text-muted">
+                        No rows to display.
+                      </td>
+                    </tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="text-muted small mt-3">
+            Cleaning steps: trim strings • normalize column names • drop empty rows/cols • parse numeric/datetime • remove duplicates.
+          </div>
+
+        </div>
       </div>
-    </div>
+    </section>
   {% endif %}
+
 </div>
 {% endblock %}
 
@@ -333,7 +379,7 @@
 
         if (f.size > MAX_BYTES) {
           status.textContent = `Selected: ${f.name} (${sizeMB}MB) — TOO LARGE (max ${MAX_MB}MB)`;
-          status.style.color = "rgb(255, 110, 110)";
+          status.style.color = "rgb(185, 28, 28)";
         } else {
           status.textContent = `Selected: ${f.name} (${sizeMB}MB)`;
           status.style.color = "";
@@ -349,7 +395,7 @@
         if (f.size > MAX_BYTES) {
           e.preventDefault();
           status.textContent = `File too large — please upload a file up to ${MAX_MB}MB.`;
-          status.style.color = "rgb(255, 110, 110)";
+          status.style.color = "rgb(185, 28, 28)";
           return;
         }
 
@@ -360,7 +406,6 @@
       });
     }
 
-    // Tabs (Before/After)
     const tabButtons = document.querySelectorAll(".tabBtn");
     const beforePanel = document.getElementById("tab-before");
     const afterPanel = document.getElementById("tab-after");
@@ -376,17 +421,16 @@
         afterPanel.style.display = "none";
       }
 
-      tabButtons.forEach(btn => {
-        const isActive = btn.getAttribute("data-tab") === tab;
-        btn.style.background = isActive ? "rgba(255,255,255,0.08)" : "transparent";
+      tabButtons.forEach(b => {
+        const isActive = b.getAttribute("data-tab") === tab;
+        b.classList.toggle("is-active", isActive);
       });
     }
 
-    tabButtons.forEach(btn => {
-      btn.addEventListener("click", () => setActive(btn.getAttribute("data-tab")));
+    tabButtons.forEach(b => {
+      b.addEventListener("click", () => setActive(b.getAttribute("data-tab")));
     });
 
-    // default active tab
     setActive("before");
   })();
 </script>

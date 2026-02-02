@@ -920,6 +920,129 @@ a:hover {
   color: #166534;
 }
 
+/* ======================================================
+   COLOR ACCENTS · AMES / SALES / CLEANER (elegant)
+   Scoped by page class to avoid side effects
+   ====================================================== */
+
+/* Reusable section head (pill + dot) */
+.page-section-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148,163,184,0.45);
+  background: rgba(255,255,255,0.70);
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+}
+
+.page-section-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #0ea5e9, #6366f1);
+}
+
+/* Accent top border for important cards */
+.accent-card {
+  position: relative;
+  overflow: hidden;
+}
+.accent-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, rgba(14,165,233,0.95), rgba(99,102,241,0.95), rgba(34,197,94,0.95));
+}
+
+/* -------------------------------
+   AMES · color + centered headings
+----------------------------------*/
+.ames-page .ames-hero {
+  background:
+    radial-gradient(900px 420px at 18% 18%, rgba(14,165,233,0.14), transparent 60%),
+    radial-gradient(900px 420px at 86% 10%, rgba(99,102,241,0.12), transparent 60%),
+    radial-gradient(900px 420px at 82% 92%, rgba(34,197,94,0.10), transparent 60%),
+    linear-gradient(135deg, #ffffff 0%, #f8fafc 45%, #eef2ff 100%);
+}
+
+.ames-page .ames-hero-title {
+  text-align: center;
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.ames-page .ames-chip-row {
+  justify-content: center !important;
+}
+
+.ames-page .ames-chart {
+  border-radius: 16px;
+}
+
+.ames-page .ames-test {
+  background: rgba(255,255,255,0.75);
+}
+
+/* -------------------------------
+   SALES · color + centered headings
+----------------------------------*/
+.sales-page .sales-hero {
+  background:
+    radial-gradient(900px 420px at 16% 12%, rgba(14,165,233,0.14), transparent 60%),
+    radial-gradient(900px 420px at 86% 10%, rgba(99,102,241,0.12), transparent 60%),
+    radial-gradient(900px 420px at 80% 92%, rgba(249,115,22,0.10), transparent 60%),
+    linear-gradient(135deg, #ffffff 0%, #f8fafc 45%, #eef2ff 100%);
+}
+
+.sales-page .sales-hero-inner > div:first-child {
+  text-align: center;
+  max-width: 940px;
+  margin: 0 auto;
+}
+
+.sales-page .sales-chip-row {
+  justify-content: center !important;
+}
+
+.sales-page .sales-chart {
+  border-radius: 16px;
+}
+
+/* -------------------------------
+   CLEANER · premium look (Bootstrap)
+----------------------------------*/
+.cleaner-page .cleaner-hero {
+  background:
+    radial-gradient(900px 420px at 18% 18%, rgba(14,165,233,0.14), transparent 60%),
+    radial-gradient(900px 420px at 86% 10%, rgba(99,102,241,0.12), transparent 60%),
+    radial-gradient(900px 420px at 80% 92%, rgba(34,197,94,0.10), transparent 60%),
+    linear-gradient(135deg, #ffffff 0%, #f8fafc 45%, #eef2ff 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.cleaner-page .cleaner-kicker {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.cleaner-page .tabBtn {
+  border-radius: 999px !important;
+}
+
+.cleaner-page .tabBtn.is-active {
+  background: rgba(14,165,233,0.10) !important;
+  border-color: rgba(14,165,233,0.35) !important;
+  color: #0369a1 !important;
+}
+
 
 @media (max-width: 992px) {
   .index-chip-row { justify-content: flex-start; }
