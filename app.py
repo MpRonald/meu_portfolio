@@ -245,9 +245,14 @@ def create_app() -> Flask:
         for c in numeric_cols:
             nomes_amig.setdefault(c, c)
 
-        default_var = "preco" if "preco" in numeric_cols else numeric_cols[0]
+        candidatos = [c for c in numeric_cols if c != "preco"]
+        default_var = candidatos[0] if candidatos else numeric_cols[0]
         var = request.form.get("variavel", default_var)
         if var not in numeric_cols:
+            var = default_var
+
+        # evita var == preco
+        if var == "preco":
             var = default_var
 
         faixas_unicas = ["Todos"]
