@@ -1,20 +1,17 @@
 import os
-import json
 import logging
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
 import pandas as pd
-import plotly
-import plotly.express as px
 
-from flask import Flask, render_template, jsonify, request, send_file, url_for
+from flask import Flask, render_template, jsonify, request, send_file
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.middleware.proxy_fix import ProxyFix
 from jinja2 import TemplateNotFound
 
-from services import PortfolioService
+from services import PortfolioService, search_music
 
 
 # =========================
@@ -35,7 +32,7 @@ DEMO_FILENAME = os.getenv("CLEANER_DEMO_FILE", "dirty_demo_dataset.csv")
 DEMO_PATH = DATA_DIR / DEMO_FILENAME
 
 # =========================
-# Ames constants (compat com teu template)
+# Ames constants
 # =========================
 COLUNAS_PROJETO = [
     "preco", "quartos", "banheiros", "area_habitavel", "area_lote",
@@ -108,7 +105,6 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
-    # ✅ Inject current year into all templates (base.html footer)
     @app.context_processor
     def inject_current_year():
         return {"current_year": datetime.now().year}
@@ -123,9 +119,8 @@ def create_app() -> Flask:
     app.config["DATA_DIR"] = str(DATA_DIR)
     app.config["ARTIF_DIR"] = str(ARTIF_DIR)
 
-    # ✅ Upload cap (server-side)
     app.config["MAX_UPLOAD_MB"] = MAX_UPLOAD_MB
-    app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES  # Flask will raise 413
+    app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
 
     _configure_logging(app)
 
@@ -153,7 +148,6 @@ def create_app() -> Flask:
             return jsonify({"error": "internal_server_error"}), 500
         return jsonify({"error": "internal_server_error", "detail": str(e)}), 500
 
-    # ✅ Friendly 413 page for the cleaner
     @app.errorhandler(RequestEntityTooLarge)
     def handle_413(_e):
         demo = _load_demo_payload()
@@ -176,17 +170,11 @@ def create_app() -> Flask:
             }), 200
 
     def _load_demo_payload():
-        """
-        Loads demo dataset from data/dirty_demo_dataset.csv.
-        Returns payload with meta + table preview (first 20 rows).
-        If missing, returns None (template handles it safely).
-        """
         path = DEMO_PATH
         if not path.exists():
             return None
 
         try:
-            # Robust delimiter sniffing
             try:
                 df = pd.read_csv(path, sep=None, engine="python")
             except Exception:
@@ -199,10 +187,7 @@ def create_app() -> Flask:
                 "cols": int(df.shape[1]),
             }
 
-            preview = df.head(20).copy()
-            # avoid NaN in template
-            preview = preview.fillna("")
-
+            preview = df.head(20).copy().fillna("")
             table = {
                 "columns": preview.columns.tolist(),
                 "rows": preview.values.tolist(),
@@ -221,10 +206,40 @@ def create_app() -> Flask:
             "env": app.config.get("ENV_NAME"),
         }), 200
 
-
     @app.route("/")
     def index():
         return safe_render("index.html")
+
+    # =========================
+    # MUSIC
+    # =========================
+    @app.route("/music", methods=["GET", "POST"])
+    def music():
+        query = ""
+        tracks = []
+        error = None
+
+        if request.method == "POST":
+            query = (request.form.get("query") or "").strip()
+
+            if not query:
+                error = "Please type a song name, artist, or genre."
+            else:
+                try:
+                    results = search_music(query)
+                    tracks = results.get("tracks", {}).get("items", [])
+                    if not tracks:
+                        error = "No results found for your search."
+                except Exception as e:
+                    app.logger.exception("Spotify search error")
+                    error = str(e)
+
+        return safe_render(
+            "music.html",
+            query=query,
+            tracks=tracks,
+            error=error,
+        )
 
     # =========================
     # AMES (EXECUTIVE)
@@ -251,7 +266,6 @@ def create_app() -> Flask:
         if var not in numeric_cols:
             var = default_var
 
-        # evita var == preco
         if var == "preco":
             var = default_var
 
@@ -341,6 +355,7 @@ def create_app() -> Flask:
                 df_f = df_f[df_f["transaction_date"] >= ds]
             except Exception:
                 warning = "Invalid start date. Ignoring date_start."
+
         if filters["date_end"]:
             try:
                 de = pd.to_datetime(filters["date_end"], errors="raise")
@@ -413,7 +428,7 @@ def create_app() -> Flask:
         )
 
     # =========================
-    # DATA CLEANER (CSV/Excel → Clean + Report → Excel/PDF)
+    # DATA CLEANER
     # =========================
     @app.route("/cleaner", methods=["GET", "POST"])
     def data_cleaner():
@@ -422,7 +437,6 @@ def create_app() -> Flask:
         demo = _load_demo_payload()
 
         if request.method == "POST":
-            # Manual check (in addition to MAX_CONTENT_LENGTH)
             if request.content_length and request.content_length > MAX_UPLOAD_BYTES:
                 error = f"File too large. Max allowed is {MAX_UPLOAD_MB}MB."
                 return safe_render(
@@ -461,7 +475,6 @@ def create_app() -> Flask:
         if not DEMO_PATH.exists():
             return jsonify({"error": "demo_not_found", "hint": f"Missing {DEMO_PATH.name} in data/"}), 404
 
-        # Let Flask infer a safe mimetype
         return send_file(
             DEMO_PATH,
             as_attachment=True,
@@ -472,6 +485,7 @@ def create_app() -> Flask:
     @app.route("/cleaner/download/<file_id>/<kind>", methods=["GET"])
     def cleaner_download(file_id: str, kind: str):
         artifacts_dir = Path(app.config["ARTIF_DIR"])
+
         if kind == "excel":
             path = artifacts_dir / f"cleaned_{file_id}.xlsx"
             mimetype = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

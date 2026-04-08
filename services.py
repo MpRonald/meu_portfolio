@@ -6,6 +6,8 @@ from datetime import datetime
 import io
 import re
 import csv
+import base64
+import requests
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -18,6 +20,71 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 from reportlab.pdfgen import canvas
 
+from spotify_config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
+
+
+# ==========================================================
+# SPOTIFY HELPERS
+# ==========================================================
+def get_spotify_token() -> str:
+    if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
+        raise RuntimeError("Spotify credentials are missing.")
+
+    if "COLOQUE_AQUI" in SPOTIFY_CLIENT_ID or "COLOQUE_AQUI" in SPOTIFY_CLIENT_SECRET:
+        raise RuntimeError("Configure SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET first.")
+
+    auth_string = f"{SPOTIFY_CLIENT_ID}:{SPOTIFY_CLIENT_SECRET}"
+    auth_bytes = auth_string.encode("utf-8")
+    auth_base64 = base64.b64encode(auth_bytes).decode("utf-8")
+
+    url = "https://accounts.spotify.com/api/token"
+    headers = {
+        "Authorization": f"Basic {auth_base64}",
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    data = {"grant_type": "client_credentials"}
+
+    response = requests.post(url, headers=headers, data=data, timeout=20)
+
+    if not response.ok:
+        raise RuntimeError(
+            f"Spotify token error ({response.status_code}): {response.text}"
+        )
+
+    payload = response.json()
+    token = payload.get("access_token")
+
+    if not token:
+        raise RuntimeError(f"Spotify token missing in response: {payload}")
+
+    return token
+
+
+def search_music(query: str) -> dict:
+    if not query or not query.strip():
+        return {"tracks": {"items": []}}
+
+    token = get_spotify_token()
+
+    url = "https://api.spotify.com/v1/search"
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+    params = {
+        "q": query.strip(),
+        "type": "track",
+        "limit": 10,
+        "market": "PT"
+    }
+
+    response = requests.get(url, headers=headers, params=params, timeout=20)
+
+    if not response.ok:
+        raise RuntimeError(
+            f"Spotify search error ({response.status_code}): {response.text}"
+        )
+
+    return response.json()
 
 class PortfolioService:
     def __init__(self, timeout: int = 30, data_dir: Optional[str] = None):
@@ -28,7 +95,6 @@ class PortfolioService:
     # Helpers (format / safety)
     # ==========================================================
     def _fmt_money(self, v: float, currency: str = "$") -> str:
-        """Executive-friendly money formatting: 1,234 -> $1,234 | 1.2M -> $1.2M"""
         try:
             if v is None or (isinstance(v, float) and np.isnan(v)):
                 return f"{currency}0"
@@ -828,7 +894,7 @@ class PortfolioService:
         }
 
     # ==========================================================
-    # ✅ Data Cleaner & Quality Report (CSV robust + dates + numeric)
+    # Data Cleaner & Quality Report
     # ==========================================================
     def read_uploaded_dataset(self, file_storage) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         filename = (file_storage.filename or "").strip()
@@ -865,12 +931,10 @@ class PortfolioService:
         if len(lines) < 2:
             raise ValueError("CSV has no data rows.")
 
-        # --- detect delimiter (comma, semicolon, tab, pipe)
         try:
             sniff = csv.Sniffer().sniff("\n".join(lines[:20]), delimiters=[",", ";", "\t", "|"])
             delim = sniff.delimiter
         except Exception:
-            # fallback heuristic
             candidates = [",", ";", "\t", "|"]
             scores = {d: lines[0].count(d) for d in candidates}
             delim = max(scores, key=scores.get) if max(scores.values()) > 0 else ","
@@ -879,7 +943,6 @@ class PortfolioService:
         header = [h.strip() for h in header_raw]
         n_cols = len(header)
 
-        # Identify money-like columns by header name
         money_idx = []
         for i, h in enumerate(header):
             h_low = h.lower()
@@ -904,7 +967,6 @@ class PortfolioService:
             while len(parts) > n_cols:
                 merged = False
 
-                # Fix decimal comma split: "1.234" ; "50" -> "1.234,50"
                 for j in money_idx:
                     if j < len(parts) - 1 and len(parts) > n_cols:
                         if (is_thousand_token(parts[j]) or is_int_token(parts[j])) and is_decimal_token(parts[j + 1]):
@@ -915,7 +977,6 @@ class PortfolioService:
                 if merged:
                     continue
 
-                # Fallback: merge last two tokens using delimiter char
                 parts[-2] = f"{parts[-2]}{delim}{parts[-1]}"
                 parts = parts[:-1]
 
@@ -944,15 +1005,6 @@ class PortfolioService:
         return c1 if c1 else "col"
 
     def clean_dataframe(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-        """
-        Opinionated cleaning:
-        - trim strings
-        - normalize column names
-        - drop fully empty rows/cols (AFTER normalizing empties)
-        - convert numeric-like strings
-        - parse datetime-like columns (robust: format="mixed")
-        - remove duplicates (exact duplicates)
-        """
         if df is None or df.empty:
             return df, {"note": "empty_df"}
 
@@ -1132,7 +1184,6 @@ class PortfolioService:
 
         c.save()
 
-    # ---------- NEW helper for before/after preview ----------
     def _df_to_preview_table(self, df: pd.DataFrame, n: int = 20) -> Dict[str, Any]:
         if df is None or df.empty:
             return {"columns": [], "rows": []}
@@ -1151,7 +1202,6 @@ class PortfolioService:
     def clean_uploaded_file(self, file_storage, artifacts_dir: Path, file_id: str) -> Dict[str, Any]:
         df_raw, meta = self.read_uploaded_dataset(file_storage)
 
-        # ✅ BEFORE preview (raw)
         table_raw = self._df_to_preview_table(df_raw, n=20)
 
         df_clean, report = self.clean_dataframe(df_raw)
@@ -1161,7 +1211,6 @@ class PortfolioService:
         self.export_excel_cleaned(df_clean, excel_path)
         self.export_pdf_report(report, meta, pdf_path)
 
-        # ✅ AFTER preview (cleaned)
         table_clean = self._df_to_preview_table(df_clean, n=20)
 
         return {

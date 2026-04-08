@@ -172,47 +172,43 @@
        INTERACTIVE PROJECTS
   ======================================================= -->
   <section class="mb-5">
-    <div class="text-center mb-4">
-      <span class="section-head">
-        <span class="section-dot"></span>
-        <span class="fw-semibold">Live demos</span>
-      </span>
+      <div class="index-project-grid">
+    <a class="card portfolio-card text-decoration-none" href="{{ url_for('data_cleaner') }}">
+      <div class="card-body text-center">
+        <div class="mb-2 fs-3">🧼</div>
+        <h5 class="fw-semibold">Data Cleaner</h5>
+        <p class="text-muted small">Clean datasets and export reports.</p>
+        <span class="badge-soft badge-sky">Most used</span>
+      </div>
+    </a>
 
-      <h2 class="h4 mt-2 mb-1">Interactive projects</h2>
-      <p class="text-muted mb-0">
-        Three hands-on apps you can open right now.<br>
-        For demonstration purposes only
-      </p>
-    </div>
+    <a class="card portfolio-card text-decoration-none" href="{{ url_for('sales_dashboard') }}">
+      <div class="card-body text-center">
+        <div class="mb-2 fs-3">🛒</div>
+        <h5 class="fw-semibold">Sales Dashboard</h5>
+        <p class="text-muted small">KPIs, trends and demand analysis.</p>
+        <span class="badge-soft badge-indigo">Dashboards</span>
+      </div>
+    </a>
 
-    <div class="index-project-grid">
-      <a class="card portfolio-card text-decoration-none" href="{{ url_for('data_cleaner') }}">
-        <div class="card-body text-center">
-          <div class="mb-2 fs-3">🧼</div>
-          <h5 class="fw-semibold">Data Cleaner</h5>
-          <p class="text-muted small">Clean datasets and export reports.</p>
-          <span class="badge-soft badge-sky">Most used</span>
-        </div>
-      </a>
+    <a class="card portfolio-card text-decoration-none" href="{{ url_for('ames_dashboard') }}">
+      <div class="card-body text-center">
+        <div class="mb-2 fs-3">🏠</div>
+        <h5 class="fw-semibold">Real Estate</h5>
+        <p class="text-muted small">EDA and housing statistics.</p>
+        <span class="badge-soft badge-green">EDA</span>
+      </div>
+    </a>
 
-      <a class="card portfolio-card text-decoration-none" href="{{ url_for('sales_dashboard') }}">
-        <div class="card-body text-center">
-          <div class="mb-2 fs-3">🛒</div>
-          <h5 class="fw-semibold">Sales Dashboard</h5>
-          <p class="text-muted small">KPIs, trends and demand analysis.</p>
-          <span class="badge-soft badge-indigo">Dashboards</span>
-        </div>
-      </a>
-
-      <a class="card portfolio-card text-decoration-none" href="{{ url_for('ames_dashboard') }}">
-        <div class="card-body text-center">
-          <div class="mb-2 fs-3">🏠</div>
-          <h5 class="fw-semibold">Real Estate</h5>
-          <p class="text-muted small">EDA and housing statistics.</p>
-          <span class="badge-soft badge-green">EDA</span>
-        </div>
-      </a>
-    </div>
+    <a class="card portfolio-card text-decoration-none" href="{{ url_for('music') }}">
+      <div class="card-body text-center">
+        <div class="mb-2 fs-3">🎵</div>
+        <h5 class="fw-semibold">Music Recommender</h5>
+        <p class="text-muted small">Search tracks and discover music with Spotify API.</p>
+        <span class="badge-soft badge-indigo">API Demo</span>
+      </div>
+    </a>
+  </div>
   </section>
 
   <!-- ======================================================
